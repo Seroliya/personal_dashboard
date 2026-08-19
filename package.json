@@ -1,0 +1,20 @@
+{
+  "name": "streaming-dashboard",
+  "version": "1.0.0",
+  "description": "Streaming media data dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "desktop": "electron desktop-panel"
+  },
+  "dependencies": {
+    "marked": "^15.0.12",
+    "playwright": "^1.45.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "sanitize-html": "^2.17.6"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0"
+  }
+}

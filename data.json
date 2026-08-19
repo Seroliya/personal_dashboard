@@ -1,0 +1,35 @@
+{
+  "zhihu": {
+    "reads": 81,
+    "likes": 0,
+    "collects": 1,
+    "updatedAt": "2026/8/7 16:28:04"
+  },
+  "bilibili": {
+    "plays": 32,
+    "likes": 4,
+    "collects": 0,
+    "updatedAt": "2026/8/7 16:28:15"
+  },
+  "lastFetch": "2026/8/7 16:28:22",
+  "status": "ok",
+  "deepseek": {
+    "tokens": 183551308,
+    "cost": 70.24,
+    "updatedAt": "2026/8/7 16:28:22"
+  },
+  "weather": {
+    "current": {
+      "temperature": 34.2,
+      "condition": "多云"
+    },
+    "tomorrow": {
+      "date": "2026-08-08",
+      "condition": "小雨",
+      "high": "32",
+      "low": "27"
+    },
+    "updatedAt": "2026-08-07 16:00",
+    "source": "中央气象台"
+  }
+}

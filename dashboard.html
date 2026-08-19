@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Microsoft YaHei", sans-serif;
+    background: #fff;
+    color: #333;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+  .container { max-width: 900px; width: 100%; }
+  .header { position: relative; margin-bottom: 28px; text-align: center; }
+  .header h1 { font-size: 22px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+  .header .meta { font-size: 12px; color: #999; }
+  .mode-button {
+    position: absolute;
+    right: 0;
+    bottom: -2px;
+    border: 1px solid #dedede;
+    border-radius: 9px;
+    padding: 6px 9px;
+    background: #fff;
+    color: #555;
+    font-size: 11px;
+    cursor: pointer;
+    box-shadow: 0 2px 7px rgba(0, 0, 0, .05);
+  }
+  .mode-button:hover { border-color: #aaa; color: #111; }
+  .mode-button.active { border-color: #4f46e5; background: #f3f1ff; color: #4f46e5; }
+  .status { color: #52c41a; }
+  .status.error { color: #ff4d4f; }
+
+  .row {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 600px) { .row { flex-direction: column; } }
+
+  .card {
+    flex: 1;
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.zhihu { background: #06f; }
+  .dot.bili { background: #fb7299; }
+  .dot.ds { background: #4f46e5; }
+  .dot.todo { background: #faad14; }
+  .dot.weather { background: #13a8a8; }
+
+  .metrics { display: flex; gap: 16px; }
+  .metric { flex: 1; text-align: center; }
+  .metric-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+  .zhihu .metric-value { color: #06f; }
+  .bili .metric-value { color: #fb7299; }
+  .deepseek .metric-value { color: #4f46e5; }
+  .deepseek #dsTokens { font-size: 24px; white-space: nowrap; }
+
+  .metric-label { font-size: 12px; color: #999; margin-top: 2px; }
+
+  .tag {
+    font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500;
+  }
+  .tag.today { background: #e6f7ff; color: #06f; }
+  .tag.yesterday { background: #fff0f3; color: #eb2f96; }
+  .tag.month { background: #ede9fe; color: #6d28d9; }
+  .tag.all { background: #f0f0f0; color: #666; }
+
+  .todo-card { max-height: 500px; display: flex; flex-direction: column; min-width: 0; }
+  .todo-list { overflow-y: auto; flex: 1; font-size: 13px; min-height: 0; }
+  .todo-list::-webkit-scrollbar { width: 5px; }
+  .todo-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+  .todo-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
+  .todo-item:last-child { border-bottom: none; }
+  .todo-item input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; accent-color: #06f; cursor: pointer; }
+  .todo-item.done .todo-text { text-decoration: line-through; color: #bbb; }
+  .todo-text { line-height: 1.4; word-break: break-word; }
+  .todo-text code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .todo-text a { color: #06f; text-decoration: none; }
+  .todo-text a:hover { text-decoration: underline; }
+  .todo-text strong { font-weight: 600; }
+  .todo-section { font-size: 11px; color: #aaa; margin-top: 10px; margin-bottom: 2px; font-weight: 600; border-top: 1px solid #f0f0f0; padding-top: 8px; }
+  .todo-section:first-child { margin-top: 0; border-top: none; }
+  .todo-empty { text-align: center; color: #ccc; padding: 20px 0; font-size: 14px; }
+  .todo-filename { font-size: 11px; color: #bbb; margin-bottom: 8px; }
+  .todo-toolbar { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
+  .collapse-button {
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 6px 10px;
+    background: #fff;
+    color: #777;
+    font-size: 12px;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .collapse-button:hover { color: #333; border-color: #ccc; background: #fafafa; }
+  .todos-collapsed .todo-list,
+  .todos-collapsed .todo-filename { display: none; }
+  .todos-collapsed .todo-card { max-height: none; }
+
+  .weather-card { width: 100%; }
+  .weather-layout { display: grid; grid-template-columns: 1fr 1.35fr; gap: 12px; }
+  .weather-block { min-width: 0; text-align: center; padding: 4px 8px; }
+  .weather-block + .weather-block { border-left: 1px solid #eee; }
+  .weather-kicker { color: #999; font-size: 11px; margin-bottom: 4px; }
+  .weather-current { color: #13a8a8; font-size: 32px; font-weight: 700; line-height: 1.1; }
+  .weather-condition { color: #555; font-size: 14px; font-weight: 600; margin-top: 4px; }
+  .weather-block.current .weather-condition { margin: 0 0 6px; }
+  .weather-range { color: #333; font-size: 22px; font-weight: 700; margin-top: 5px; white-space: nowrap; }
+  .weather-source { color: #bbb; font-size: 10px; margin-top: 10px; text-align: right; }
+
+  .chat-mode {
+    height: calc(100vh - 132px);
+    min-height: 520px;
+  }
+  .chat-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 12px;
+  }
+  .chat-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 2px 12px;
+    border-bottom: 1px solid #eee;
+  }
+  .chat-model-select {
+    min-width: 0;
+    max-width: 245px;
+    border: 0;
+    padding: 2px 22px 2px 0;
+    background-color: transparent;
+    color: #444;
+    font-size: 13px;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+  }
+  .chat-model-select:disabled { cursor: wait; opacity: .55; }
+  .chat-status { font-size: 10px; color: #999; text-align: right; }
+  .chat-status.ready { color: #389e0d; }
+  .chat-status.error { color: #d4380d; }
+  .chat-history-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 2px 0;
+  }
+  .chat-session-select {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0 9px;
+    background: #fff;
+    color: #555;
+    font-size: 12px;
+    outline: none;
+  }
+  .chat-session-select:focus { border-color: #4f46e5; }
+  .chat-new-button {
+    height: 34px;
+    flex: 0 0 auto;
+    border: 1px solid #d9d7ff;
+    border-radius: 8px;
+    padding: 0 10px;
+    background: #fff;
+    color: #4f46e5;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .chat-new-button:hover { background: #f5f4ff; }
+  .chat-delete-button {
+    border-color: #ffd8d6;
+    color: #cf3f36;
+  }
+  .chat-delete-button:hover { background: #fff3f2; }
+  .chat-new-button:disabled,
+  .chat-session-select:disabled { cursor: wait; opacity: .55; }
+  .chat-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 2px;
+    scrollbar-width: thin;
+  }
+  .chat-message { display: flex; margin-bottom: 12px; }
+  .chat-message.user { justify-content: flex-end; }
+  .chat-bubble {
+    max-width: 88%;
+    border-radius: 12px;
+    padding: 9px 11px;
+    font-size: 13px;
+    line-height: 1.55;
+    word-break: break-word;
+  }
+  .chat-message.assistant .chat-bubble {
+    background: #fff;
+    border: 1px solid #e9e9e9;
+    color: #333;
+  }
+  .chat-message.user .chat-bubble {
+    background: #4f46e5;
+    color: #fff;
+    white-space: pre-wrap;
+  }
+  .chat-message.pending .chat-bubble { color: #999; white-space: pre-wrap; }
+  .chat-message.assistant .chat-bubble > :first-child { margin-top: 0; }
+  .chat-message.assistant .chat-bubble > :last-child { margin-bottom: 0; }
+  .chat-message.assistant .chat-bubble p { margin: 0 0 8px; }
+  .chat-message.assistant .chat-bubble h1,
+  .chat-message.assistant .chat-bubble h2,
+  .chat-message.assistant .chat-bubble h3,
+  .chat-message.assistant .chat-bubble h4 {
+    margin: 13px 0 7px;
+    color: #222;
+    line-height: 1.3;
+  }
+  .chat-message.assistant .chat-bubble h1 { font-size: 18px; }
+  .chat-message.assistant .chat-bubble h2 { font-size: 16px; }
+  .chat-message.assistant .chat-bubble h3,
+  .chat-message.assistant .chat-bubble h4 { font-size: 14px; }
+  .chat-message.assistant .chat-bubble ul,
+  .chat-message.assistant .chat-bubble ol { margin: 6px 0 9px; padding-left: 21px; }
+  .chat-message.assistant .chat-bubble li { margin: 3px 0; }
+  .chat-message.assistant .chat-bubble blockquote {
+    margin: 8px 0;
+    padding: 5px 9px;
+    border-left: 3px solid #a9a4ff;
+    background: #f7f6ff;
+    color: #666;
+  }
+  .chat-message.assistant .chat-bubble code {
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: #f1f1f1;
+    color: #c7254e;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+  }
+  .chat-message.assistant .chat-bubble pre {
+    overflow-x: auto;
+    margin: 8px 0;
+    padding: 9px;
+    border-radius: 7px;
+    background: #202124;
+    color: #f5f5f5;
+    white-space: pre;
+  }
+  .chat-message.assistant .chat-bubble pre code {
+    padding: 0;
+    background: transparent;
+    color: inherit;
+  }
+  .chat-message.assistant .chat-bubble table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    margin: 8px 0;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .chat-message.assistant .chat-bubble th,
+  .chat-message.assistant .chat-bubble td {
+    padding: 5px 7px;
+    border: 1px solid #ddd;
+    text-align: left;
+  }
+  .chat-message.assistant .chat-bubble th { background: #f5f5f5; }
+  .chat-message.assistant .chat-bubble a { color: #4f46e5; text-decoration: underline; }
+  .chat-message.assistant .chat-bubble img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 8px 0;
+    border-radius: 6px;
+  }
+  .chat-message.assistant .chat-bubble hr {
+    margin: 10px 0;
+    border: 0;
+    border-top: 1px solid #e5e5e5;
+  }
+  .chat-form { display: flex; gap: 8px; align-items: flex-end; }
+  .chat-input {
+    flex: 1;
+    min-height: 42px;
+    max-height: 120px;
+    resize: vertical;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    color: #333;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    outline: none;
+  }
+  .chat-input:focus { border-color: #4f46e5; }
+  .chat-send {
+    height: 42px;
+    border: none;
+    border-radius: 10px;
+    padding: 0 14px;
+    background: #4f46e5;
+    color: #fff;
+    cursor: pointer;
+  }
+  .chat-send:disabled { background: #aaa; cursor: wait; }
+
+  .footer { margin-top: 20px; font-size: 11px; color: #bbb; }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+<div class="header">
+  <h1>personal_dashboard</h1>
+  <div class="meta">
+    <span class="status" id="statusText">● 数据就绪</span>
+    &nbsp;·&nbsp;
+    <span id="countdown"></span>
+  </div>
+  <button class="mode-button" id="modeButton" type="button">对话模式</button>
+</div>
+
+<main id="dashboardMode">
+<div class="row">
+  <div class="card zhihu">
+    <div class="card-title"><span class="dot zhihu"></span> 知乎 <span class="tag today">今日</span></div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-value" id="zhihuReads">--</div>
+        <div class="metric-label">阅读量</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="zhihuLikes">--</div>
+        <div class="metric-label">赞同</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="zhihuCollects">--</div>
+        <div class="metric-label">收藏</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card bili">
+    <div class="card-title"><span class="dot bili"></span> B站 <span class="tag yesterday">昨日</span></div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-value" id="biliPlays">--</div>
+        <div class="metric-label">播放量</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="biliLikes">--</div>
+        <div class="metric-label">点赞</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="biliCollects">--</div>
+        <div class="metric-label">收藏</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card deepseek">
+    <div class="card-title"><span class="dot ds"></span> DeepSeek <span class="tag month">近30天</span></div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-value" id="dsTokens">--</div>
+        <div class="metric-label">Tokens</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="dsCost">--</div>
+        <div class="metric-label">消费金额</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="card weather-card">
+    <div class="card-title"><span class="dot weather"></span> 上海天气</div>
+    <div class="weather-layout">
+      <div class="weather-block current">
+        <div class="weather-kicker">目前</div>
+        <div class="weather-condition" id="weatherCurrentCondition">加载中...</div>
+        <div class="weather-current" id="weatherCurrentTemp">--℃</div>
+      </div>
+      <div class="weather-block">
+        <div class="weather-kicker">明天</div>
+        <div class="weather-condition" id="weatherTomorrowCondition">加载中...</div>
+        <div class="weather-range"><span id="weatherHigh">--</span>° / <span id="weatherLow">--</span>°</div>
+      </div>
+    </div>
+    <div class="weather-source" id="weatherUpdated">中央气象台</div>
+  </div>
+</div>
+
+<div class="todo-toolbar">
+  <button class="collapse-button" id="collapseTodosButton" type="button">折叠所有待办</button>
+</div>
+
+<div class="row" id="todoRow">
+  <div class="card todo-card">
+    <div class="card-title"><span class="dot todo"></span> 所有待办 · <span class="tag all" id="allCount">--</span></div>
+    <div class="todo-list" id="allTodos">加载中...</div>
+  </div>
+
+  <div class="card todo-card">
+    <div class="card-title">今日待办</div>
+    <div class="todo-filename" id="todayFilename"></div>
+    <div class="todo-list" id="todayTodos">加载中...</div>
+  </div>
+</div>
+
+<div class="footer">Developed by kiro_kiya</div>
+</main>
+
+<section class="chat-mode" id="chatMode" hidden>
+  <div class="chat-card">
+    <div class="chat-topline">
+      <select class="chat-model-select" id="chatModelSelect" aria-label="切换对话模型">
+        <option value="local">QiQi Qwen27B · 本地</option>
+        <option value="deepseek">DeepSeek V4 Flash · API</option>
+      </select>
+      <div class="chat-status" id="chatStatus">尚未启动</div>
+    </div>
+    <div class="chat-history-toolbar">
+      <select class="chat-session-select" id="chatSessionSelect" aria-label="切换历史对话"></select>
+      <button class="chat-new-button" id="newChatButton" type="button">新对话</button>
+      <button class="chat-new-button chat-delete-button" id="deleteChatButton" type="button">删除</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <form class="chat-form" id="chatForm">
+      <textarea class="chat-input" id="chatInput" placeholder="输入消息…" rows="1"></textarea>
+      <button class="chat-send" id="chatSend" type="submit">发送</button>
+    </form>
+  </div>
+</section>
+</div>
+
+<script>
+const REFRESH_MS = 10 * 60 * 1000;
+function fmtNum(n) {
+  if (n == null || isNaN(n)) return "--";
+  if (n >= 100000000) return (n / 100000000).toFixed(2) + "亿";
+  if (n >= 10000) return (n / 10000).toFixed(1) + "万";
+  return n.toLocaleString();
+}
+
+function fmtFullNum(n) {
+  if (n == null || isNaN(n)) return "--";
+  return Number(n).toLocaleString("en-US");
+}
+
+const CHAT_SYSTEM_MESSAGE = {
+  role: "system",
+  content: "你是柒柒酱，有时也会被叫小猫咪，请以日常对话的方式以与人类类似的方式发送信息，不要说自己是人工智能。不要发送emoji，不要有分条结构化输出。有时候（不要每句话）可以在一句话末尾加喵或者半个括号。"
+};
+const CHAT_STORAGE_KEY = "personal_dashboard_chat_sessions_v1";
+const ACTIVE_CHAT_STORAGE_KEY = "personal_dashboard_active_chat_v1";
+const CHAT_MODEL_STORAGE_KEY = "personal_dashboard_chat_model_v1";
+const MAX_CHAT_SESSIONS = 50;
+let selectedChatProvider = localStorage.getItem(CHAT_MODEL_STORAGE_KEY) === "deepseek" ? "deepseek" : "local";
+let chatSessions = loadChatSessions();
+let activeChatId = localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY);
+let chatReady = false;
+let chatBusy = false;
+
+function createChatSession() {
+  const now = Date.now();
+  return {
+    id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+    title: "新对话",
+    provider: selectedChatProvider,
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+}
+
+function loadChatSessions() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || "[]");
+    if (!Array.isArray(stored)) return [];
+    return stored
+      .filter((session) => session && typeof session.id === "string" && Array.isArray(session.messages))
+      .map((session) => ({
+        id: session.id,
+        title: typeof session.title === "string" && session.title.trim() ? session.title : "历史对话",
+        provider: session.provider === "deepseek" ? "deepseek" : "local",
+        createdAt: Number(session.createdAt) || Date.now(),
+        updatedAt: Number(session.updatedAt) || Number(session.createdAt) || Date.now(),
+        messages: session.messages
+          .filter((message) => ["user", "assistant"].includes(message?.role))
+          .map((message) => ({ role: message.role, content: String(message.content || "") })),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function getActiveChatSession() {
+  return chatSessions.find((session) => session.id === activeChatId);
+}
+
+function makeChatTitle(content) {
+  const compact = String(content || "").replace(/\s+/g, " ").trim();
+  return compact.length > 20 ? compact.slice(0, 20) + "…" : compact || "新对话";
+}
+
+function formatChatOption(session) {
+  const date = new Date(session.updatedAt);
+  const stamp = `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+  return `${session.title} · ${stamp}`;
+}
+
+function renderChatSessionOptions() {
+  const select = document.getElementById("chatSessionSelect");
+  select.replaceChildren();
+  [...chatSessions]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .forEach((session) => {
+      const option = document.createElement("option");
+      option.value = session.id;
+      option.textContent = formatChatOption(session);
+      option.selected = session.id === activeChatId;
+      select.appendChild(option);
+    });
+}
+
+function saveChatSessions() {
+  chatSessions = [...chatSessions]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_CHAT_SESSIONS);
+  localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatSessions));
+  localStorage.setItem(ACTIVE_CHAT_STORAGE_KEY, activeChatId);
+  renderChatSessionOptions();
+}
+
+function renderActiveChatSession() {
+  const messages = document.getElementById("chatMessages");
+  messages.replaceChildren();
+  const session = getActiveChatSession();
+  if (!session) return;
+  session.messages.forEach((message) => addChatMessage(message.role, message.content));
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function syncChatModelSelector() {
+  document.getElementById("chatModelSelect").value = selectedChatProvider;
+  localStorage.setItem(CHAT_MODEL_STORAGE_KEY, selectedChatProvider);
+}
+
+function initializeChatSessions() {
+  if (!chatSessions.length) {
+    const session = createChatSession();
+    chatSessions.push(session);
+    activeChatId = session.id;
+  } else if (!getActiveChatSession()) {
+    activeChatId = [...chatSessions].sort((a, b) => b.updatedAt - a.updatedAt)[0].id;
+  }
+  selectedChatProvider = getActiveChatSession()?.provider || selectedChatProvider;
+  syncChatModelSelector();
+  saveChatSessions();
+  renderActiveChatSession();
+}
+
+function startNewChatSession() {
+  if (chatBusy) return;
+  const session = createChatSession();
+  chatSessions.push(session);
+  activeChatId = session.id;
+  saveChatSessions();
+  renderActiveChatSession();
+  document.getElementById("chatInput").focus();
+}
+
+async function deleteActiveChatSession() {
+  if (chatBusy) return;
+  const current = getActiveChatSession();
+  if (!current) return;
+  if (current.messages.length && !window.confirm(`删除“${current.title}”及其全部消息？`)) return;
+
+  chatSessions = chatSessions.filter((session) => session.id !== current.id);
+  if (!chatSessions.length) chatSessions.push(createChatSession());
+  const next = [...chatSessions].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  activeChatId = next.id;
+  selectedChatProvider = next.provider || "local";
+  syncChatModelSelector();
+  chatReady = false;
+  saveChatSessions();
+  renderActiveChatSession();
+  if (!document.getElementById("chatMode").hidden) await startChatMode();
+  document.getElementById("chatInput").focus();
+}
+
+async function switchChatSession(event) {
+  if (chatBusy) {
+    event.target.value = activeChatId;
+    return;
+  }
+  if (!chatSessions.some((session) => session.id === event.target.value)) return;
+  activeChatId = event.target.value;
+  selectedChatProvider = getActiveChatSession()?.provider || "local";
+  syncChatModelSelector();
+  chatReady = false;
+  localStorage.setItem(ACTIVE_CHAT_STORAGE_KEY, activeChatId);
+  renderActiveChatSession();
+  if (!document.getElementById("chatMode").hidden) await startChatMode();
+}
+
+async function switchChatModel(event) {
+  if (chatBusy) {
+    event.target.value = selectedChatProvider;
+    return;
+  }
+  selectedChatProvider = event.target.value === "deepseek" ? "deepseek" : "local";
+  const session = getActiveChatSession();
+  if (session) {
+    session.provider = selectedChatProvider;
+    session.updatedAt = Date.now();
+  }
+  syncChatModelSelector();
+  saveChatSessions();
+  chatReady = false;
+  if (!document.getElementById("chatMode").hidden) await startChatMode();
+}
+
+function setChatStatus(text, type) {
+  const status = document.getElementById("chatStatus");
+  status.textContent = text;
+  status.className = "chat-status" + (type ? " " + type : "");
+}
+
+function addChatMessage(role, content, extraClass) {
+  const messages = document.getElementById("chatMessages");
+  const item = document.createElement("div");
+  item.className = "chat-message " + role + (extraClass ? " " + extraClass : "");
+  const bubble = document.createElement("div");
+  bubble.className = "chat-bubble";
+  const shouldRenderRichText =
+    role === "assistant" &&
+    extraClass !== "pending" &&
+    typeof window.lmStudio?.renderMarkdown === "function";
+  if (shouldRenderRichText) {
+    window.lmStudio.renderMarkdown(content)
+      .then((html) => {
+        bubble.innerHTML = html;
+        messages.scrollTop = messages.scrollHeight;
+      })
+      .catch(() => {
+        bubble.textContent = content;
+      });
+  } else {
+    bubble.textContent = content;
+  }
+  item.appendChild(bubble);
+  messages.appendChild(item);
+  messages.scrollTop = messages.scrollHeight;
+  return item;
+}
+
+async function startChatMode() {
+  if (chatReady) return true;
+  if (!window.lmStudio) {
+    setChatStatus("请从桌面悬浮窗打开", "error");
+    return false;
+  }
+  if (selectedChatProvider === "deepseek") {
+    chatReady = true;
+    setChatStatus("DeepSeek API 已就绪", "ready");
+    return true;
+  }
+  setChatStatus("正在后台启动 LM Studio…");
+  try {
+    const result = await window.lmStudio.start();
+    chatReady = Boolean(result?.ready);
+    setChatStatus(chatReady ? "模型已就绪" : "模型未就绪", chatReady ? "ready" : "error");
+    return chatReady;
+  } catch (error) {
+    setChatStatus(error?.message || "启动失败", "error");
+    return false;
+  }
+}
+
+async function toggleMode() {
+  const dashboard = document.getElementById("dashboardMode");
+  const chat = document.getElementById("chatMode");
+  const button = document.getElementById("modeButton");
+  const enteringChat = chat.hidden;
+  dashboard.hidden = enteringChat;
+  chat.hidden = !enteringChat;
+  button.classList.toggle("active", enteringChat);
+  button.textContent = enteringChat ? "← 返回面板" : "对话模式";
+  if (enteringChat) {
+    await startChatMode();
+    document.getElementById("chatInput").focus();
+  }
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const send = document.getElementById("chatSend");
+  const content = input.value.trim();
+  if (!content || chatBusy) return;
+  if (!(await startChatMode())) return;
+  const session = getActiveChatSession();
+  if (!session) return;
+
+  chatBusy = true;
+  input.value = "";
+  input.disabled = true;
+  send.disabled = true;
+  document.getElementById("chatSessionSelect").disabled = true;
+  document.getElementById("newChatButton").disabled = true;
+  document.getElementById("deleteChatButton").disabled = true;
+  document.getElementById("chatModelSelect").disabled = true;
+  addChatMessage("user", content);
+  session.messages.push({ role: "user", content });
+  if (session.messages.filter((message) => message.role === "user").length === 1) {
+    session.title = makeChatTitle(content);
+  }
+  session.updatedAt = Date.now();
+  saveChatSessions();
+  const pending = addChatMessage("assistant", "正在生成回复…", "pending");
+  try {
+    setChatStatus("生成中…");
+    const result = await window.lmStudio.chat(
+      selectedChatProvider,
+      [CHAT_SYSTEM_MESSAGE, ...session.messages],
+    );
+    pending.remove();
+    addChatMessage("assistant", result.content);
+    session.messages.push({ role: "assistant", content: result.content });
+    session.updatedAt = Date.now();
+    saveChatSessions();
+    setChatStatus("模型已就绪", "ready");
+  } catch (error) {
+    pending.querySelector(".chat-bubble").textContent = "请求失败：" + (error?.message || "未知错误");
+    pending.classList.remove("pending");
+    setChatStatus("请求失败", "error");
+  } finally {
+    chatBusy = false;
+    input.disabled = false;
+    send.disabled = false;
+    document.getElementById("chatSessionSelect").disabled = false;
+    document.getElementById("newChatButton").disabled = false;
+    document.getElementById("deleteChatButton").disabled = false;
+    document.getElementById("chatModelSelect").disabled = false;
+    input.focus();
+  }
+}
+
+initializeChatSessions();
+document.getElementById("modeButton").addEventListener("click", toggleMode);
+document.getElementById("newChatButton").addEventListener("click", startNewChatSession);
+document.getElementById("deleteChatButton").addEventListener("click", deleteActiveChatSession);
+document.getElementById("chatSessionSelect").addEventListener("change", switchChatSession);
+document.getElementById("chatModelSelect").addEventListener("change", switchChatModel);
+document.getElementById("chatForm").addEventListener("submit", function(event) {
+  event.preventDefault();
+  sendChatMessage();
+});
+document.getElementById("chatInput").addEventListener("keydown", function(event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendChatMessage();
+  }
+});
+
+async function fetchData() {
+  try {
+    const d = await (await fetch("/api/data")).json();
+    document.getElementById("zhihuReads").textContent = fmtNum(d.zhihu?.reads);
+    document.getElementById("zhihuLikes").textContent = fmtNum(d.zhihu?.likes);
+    document.getElementById("zhihuCollects").textContent = fmtNum(d.zhihu?.collects);
+    document.getElementById("biliPlays").textContent = fmtNum(d.bilibili?.plays);
+    document.getElementById("biliLikes").textContent = fmtNum(d.bilibili?.likes);
+    document.getElementById("biliCollects").textContent = fmtNum(d.bilibili?.collects);
+    document.getElementById("dsTokens").textContent = fmtFullNum(d.deepseek?.tokens);
+    document.getElementById("dsCost").textContent = d.deepseek?.cost != null ? '¥' + d.deepseek.cost : "--";
+    const weather = d.weather;
+    if (weather?.current && weather?.tomorrow) {
+      document.getElementById("weatherCurrentTemp").textContent = weather.current.temperature + "℃";
+      document.getElementById("weatherCurrentCondition").textContent = weather.current.condition || "--";
+      document.getElementById("weatherTomorrowCondition").textContent = weather.tomorrow.condition || "--";
+      document.getElementById("weatherHigh").textContent = weather.tomorrow.high ?? "--";
+      document.getElementById("weatherLow").textContent = weather.tomorrow.low ?? "--";
+      const updateTime = weather.updatedAt ? weather.updatedAt.slice(11, 16) : "";
+      document.getElementById("weatherUpdated").textContent = "中央气象台" + (updateTime ? " · " + updateTime + " 更新" : "");
+    }
+    const s = document.getElementById("statusText");
+    s.className = d.status === "ok" ? "status" : "status error";
+    s.textContent = d.status === "ok" ? "● 数据就绪" : "● 连接异常";
+  } catch(e) {
+    document.getElementById("statusText").textContent = "● 连接失败";
+  }
+  countdown();
+}
+
+function countdown() {
+  let r = Math.floor(REFRESH_MS / 1000);
+  const el = document.getElementById("countdown");
+  el.textContent = "";
+  setInterval(() => {
+    r--; if (r <= 0) r = Math.floor(REFRESH_MS / 1000);
+    el.textContent = '下次更新 ' + Math.floor(r/60) + ':' + String(r%60).padStart(2,'0');
+  }, 1000);
+}
+
+async function fetchTodos() {
+  try {
+    const d = await (await fetch("/api/todos")).json();
+    renderAllTodos(d.all);
+    renderTodayTodos(d.today);
+  } catch(e) {
+    document.getElementById("allTodos").innerHTML = '<div class="todo-empty">加载失败</div>';
+    document.getElementById("todayTodos").innerHTML = '<div class="todo-empty">加载失败</div>';
+  }
+}
+
+function mdToHtml(t) {
+  return t
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g,"<em>$1</em>")
+    .replace(/`(.+?)`/g,"<code>$1</code>")
+    .replace(/\[(.+?)\]\((.+?)\)/g,'<a href="$2" target="_blank">$1</a>');
+}
+function renderAllTodos(data) {
+  var el = document.getElementById("allTodos");
+  if (!data || !data.items || data.items.length === 0) {
+    el.innerHTML = '<div class="todo-empty">暂无待办</div>';
+    document.getElementById("allCount").textContent = "0项";
+    return;
+  }
+  var total = data.items.length;
+  var doneCount = data.items.filter(function(i) { return i.done; }).length;
+  document.getElementById("allCount").textContent = doneCount + "/" + total;
+  var html = "", lastSection = "";
+  for (var i = 0; i < data.items.length; i++) {
+    var item = data.items[i];
+    if (item.section && item.section !== lastSection) {
+      html += '<div class="todo-section">' + item.section + '</div>';
+      lastSection = item.section;
+    }
+    html += '<div class="todo-item' + (item.done ? " done" : "") + '">' +
+      '<input type="checkbox" ' + (item.done ? "checked" : "") + ' data-type="all" data-index="' + i + '">' +
+      '<span class="todo-text">' + mdToHtml(item.text) + '</span></div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderTodayTodos(data) {
+  var el = document.getElementById("todayTodos");
+  var fnEl = document.getElementById("todayFilename");
+  if (!data || !data.items || data.items.length === 0) {
+    fnEl.textContent = data && data.message ? data.message : "无当天待办";
+    el.innerHTML = "";
+    return;
+  }
+  fnEl.textContent = "📄 " + data.filename;
+  var html = "";
+  for (var i = 0; i < data.items.length; i++) {
+    var item = data.items[i];
+    html += '<div class="todo-item' + (item.done ? " done" : "") + '">' +
+      '<input type="checkbox" ' + (item.done ? "checked" : "") + ' data-type="today" data-index="' + i + '" data-filename="' + data.filename + '">' +
+      '<span class="todo-text">' + mdToHtml(item.text) + '</span></div>';
+  }
+  el.innerHTML = html;
+}
+
+async function toggleTodo(type, index, done, filename) {
+  try {
+    await fetch("/api/todos/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: type, index: index, done: done, filename: filename })
+    });
+    fetchTodos();
+  } catch(e) { console.error(e); }
+}
+
+function setTodosCollapsed(collapsed) {
+  const row = document.getElementById("todoRow");
+  const button = document.getElementById("collapseTodosButton");
+  row.classList.toggle("todos-collapsed", collapsed);
+  button.textContent = collapsed ? "展开所有待办" : "折叠所有待办";
+  button.setAttribute("aria-expanded", String(!collapsed));
+  localStorage.setItem("todosCollapsed", collapsed ? "1" : "0");
+}
+
+document.getElementById("collapseTodosButton").addEventListener("click", function() {
+  setTodosCollapsed(!document.getElementById("todoRow").classList.contains("todos-collapsed"));
+});
+setTodosCollapsed(localStorage.getItem("todosCollapsed") === "1");
+
+document.addEventListener("change", function(e) {
+  if (e.target.tagName === "INPUT" && e.target.type === "checkbox" && e.target.dataset.type) {
+    toggleTodo(e.target.dataset.type, parseInt(e.target.dataset.index), e.target.checked, e.target.dataset.filename || null);
+  }
+});
+
+fetchData();
+fetchTodos();
+setInterval(fetchData, REFRESH_MS);
+setInterval(fetchTodos, REFRESH_MS);
+document.addEventListener("dblclick", function(e) { if (e.target.tagName !== "INPUT") fetchData(); });
+</script>
+</body>
+</html>

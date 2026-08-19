@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>正在启动 Personal Dashboard</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-content: center;
+      gap: 14px;
+      color: #777;
+      background: #fff;
+      text-align: center;
+      font: 14px -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      margin: auto;
+      border: 3px solid #eee;
+      border-top-color: #777;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    .error { color: #d4380d; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div id="message">正在启动仪表盘服务…</div>
+</body>
+</html>

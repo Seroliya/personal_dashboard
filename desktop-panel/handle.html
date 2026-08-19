@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Personal Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      user-select: none;
+      background: transparent;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+    button {
+      width: 48px;
+      height: 48px;
+      margin: 4px;
+      padding: 0;
+      display: grid;
+      place-content: center;
+      gap: 5px;
+      border: 1px solid rgba(0, 0, 0, .08);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .98);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+      cursor: grab;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+      outline: none;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+    }
+    button:active { cursor: grabbing; transform: scale(.97); }
+    span {
+      display: block;
+      width: 22px;
+      height: 3px;
+      border-radius: 3px;
+      background: #686868;
+      transition: transform 180ms ease, opacity 180ms ease;
+      transform-origin: center;
+    }
+    button.open span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+    button.open span:nth-child(2) { opacity: 0; }
+    button.open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+  </style>
+</head>
+<body>
+  <button id="menu" type="button" aria-label="展开仪表盘">
+    <span></span><span></span><span></span>
+  </button>
+  <script>
+    const button = document.getElementById("menu");
+    let start;
+    let moved = false;
+
+    button.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      start = { x: event.screenX, y: event.screenY };
+      moved = false;
+      button.setPointerCapture(event.pointerId);
+      window.desktopPanel.dragStart(event.screenX, event.screenY);
+    });
+
+    button.addEventListener("pointermove", (event) => {
+      if (!start) return;
+      if (Math.hypot(event.screenX - start.x, event.screenY - start.y) > 4) moved = true;
+      if (moved) window.desktopPanel.dragMove(event.screenX, event.screenY);
+    });
+
+    button.addEventListener("pointerup", () => {
+      if (!start) return;
+      window.desktopPanel.dragEnd();
+      if (!moved) window.desktopPanel.toggle();
+      start = undefined;
+    });
+
+    button.addEventListener("pointercancel", () => {
+      window.desktopPanel.dragEnd();
+      start = undefined;
+    });
+
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      window.desktopPanel.dragEnd();
+      start = undefined;
+      window.desktopPanel.restart();
+    });
+
+    window.desktopPanel.onPanelState((open) => {
+      button.classList.toggle("open", open);
+      button.setAttribute("aria-label", open ? "收起仪表盘" : "展开仪表盘");
+    });
+  </script>
+</body>
+</html>

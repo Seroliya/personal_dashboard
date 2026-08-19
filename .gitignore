@@ -1,0 +1,4 @@
+desktop-panel/secrets.json
+node_modules/
+.browser-data/
+.auth.json
