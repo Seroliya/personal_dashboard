@@ -17,39 +17,25 @@
     padding: 40px 20px;
   }
   .container { max-width: 900px; width: 100%; }
-  .header { margin-bottom: 20px; text-align: center; }
+  .header { position: relative; margin-bottom: 28px; text-align: center; }
   .header h1 { font-size: 22px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
   .header .meta { font-size: 12px; color: #999; }
-  .mode-tabs {
-    display: flex;
-    gap: 8px;
-    margin-top: 14px;
-    padding: 4px;
-    border: 1px solid #ececec;
-    border-radius: 11px;
-    background: #f7f7f7;
-  }
   .mode-button {
-    flex: 1;
-    min-width: 0;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    padding: 7px 6px;
-    background: transparent;
-    color: #555;
-    font-size: 12px;
-    cursor: pointer;
-    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
-  }
-  .mode-button:hover { background: #fff; color: #111; }
-  .mode-button.active {
-    border-color: #dedcff;
+    position: absolute;
+    right: 0;
+    bottom: -2px;
+    border: 1px solid #dedede;
+    border-radius: 9px;
+    padding: 6px 9px;
     background: #fff;
-    color: #4f46e5;
+    color: #555;
+    font-size: 11px;
+    cursor: pointer;
     box-shadow: 0 2px 7px rgba(0, 0, 0, .05);
   }
+  .mode-button:hover { border-color: #aaa; color: #111; }
+  .mode-button.active { border-color: #4f46e5; background: #f3f1ff; color: #4f46e5; }
   .status { color: #52c41a; }
-  .status.starting { color: #d48806; }
   .status.error { color: #ff4d4f; }
 
   .row {
@@ -361,18 +347,14 @@
 <div class="header">
   <h1>personal_dashboard</h1>
   <div class="meta">
-    <span class="status starting" id="statusText">● 信息服务启动中</span>
+    <span class="status" id="statusText">● 数据就绪</span>
     &nbsp;·&nbsp;
     <span id="countdown"></span>
   </div>
-  <nav class="mode-tabs" aria-label="页面切换">
-    <button class="mode-button active" id="summaryModeButton" type="button" aria-selected="true">信息总结</button>
-    <button class="mode-button" id="todoModeButton" type="button" aria-selected="false">日常待办</button>
-    <button class="mode-button" id="modeButton" type="button" aria-selected="false">对话模式</button>
-  </nav>
+  <button class="mode-button" id="modeButton" type="button">对话模式</button>
 </div>
 
-<main id="summaryMode">
+<main id="dashboardMode">
 <div class="row">
   <div class="card zhihu">
     <div class="card-title"><span class="dot zhihu"></span> 知乎 <span class="tag today">今日</span></div>
@@ -445,9 +427,7 @@
     <div class="weather-source" id="weatherUpdated">中央气象台</div>
   </div>
 </div>
-</main>
 
-<section id="todoMode" hidden>
 <div class="todo-toolbar">
   <button class="collapse-button" id="collapseTodosButton" type="button">折叠所有待办</button>
 </div>
@@ -464,7 +444,9 @@
     <div class="todo-list" id="todayTodos">加载中...</div>
   </div>
 </div>
-</section>
+
+<div class="footer">Developed by kiro_kiya</div>
+</main>
 
 <section class="chat-mode" id="chatMode" hidden>
   <div class="chat-card">
@@ -487,8 +469,6 @@
     </form>
   </div>
 </section>
-
-<div class="footer">Developed by kiro_kiya</div>
 </div>
 
 <script>
@@ -736,23 +716,16 @@ async function startChatMode() {
   }
 }
 
-async function setAppMode(mode) {
-  const selectedMode = ["summary", "todo", "chat"].includes(mode) ? mode : "summary";
-  const modes = {
-    summary: { panel: "summaryMode", button: "summaryModeButton" },
-    todo: { panel: "todoMode", button: "todoModeButton" },
-    chat: { panel: "chatMode", button: "modeButton" },
-  };
-
-  Object.entries(modes).forEach(([name, config]) => {
-    const active = name === selectedMode;
-    document.getElementById(config.panel).hidden = !active;
-    const button = document.getElementById(config.button);
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-selected", String(active));
-  });
-
-  if (selectedMode === "chat") {
+async function toggleMode() {
+  const dashboard = document.getElementById("dashboardMode");
+  const chat = document.getElementById("chatMode");
+  const button = document.getElementById("modeButton");
+  const enteringChat = chat.hidden;
+  dashboard.hidden = enteringChat;
+  chat.hidden = !enteringChat;
+  button.classList.toggle("active", enteringChat);
+  button.textContent = enteringChat ? "← 返回面板" : "对话模式";
+  if (enteringChat) {
     await startChatMode();
     document.getElementById("chatInput").focus();
   }
@@ -812,10 +785,7 @@ async function sendChatMessage() {
 }
 
 initializeChatSessions();
-setAppMode("summary");
-document.getElementById("summaryModeButton").addEventListener("click", () => setAppMode("summary"));
-document.getElementById("todoModeButton").addEventListener("click", () => setAppMode("todo"));
-document.getElementById("modeButton").addEventListener("click", () => setAppMode("chat"));
+document.getElementById("modeButton").addEventListener("click", toggleMode);
 document.getElementById("newChatButton").addEventListener("click", startNewChatSession);
 document.getElementById("deleteChatButton").addEventListener("click", deleteActiveChatSession);
 document.getElementById("chatSessionSelect").addEventListener("change", switchChatSession);
@@ -853,20 +823,10 @@ async function fetchData() {
       document.getElementById("weatherUpdated").textContent = "中央气象台" + (updateTime ? " · " + updateTime + " 更新" : "");
     }
     const s = document.getElementById("statusText");
-    if (["starting", "refreshing"].includes(d.collectorStatus)) {
-      s.className = "status starting";
-      s.textContent = d.collectorStatus === "refreshing" ? "● 信息更新中" : "● 信息服务启动中";
-    } else if (d.collectorStatus === "error") {
-      s.className = "status error";
-      s.textContent = "● 信息获取不可用";
-    } else {
-      s.className = d.status === "ok" ? "status" : "status error";
-      s.textContent = d.status === "ok" ? "● 数据就绪" : "● 暂无信息数据";
-    }
+    s.className = d.status === "ok" ? "status" : "status error";
+    s.textContent = d.status === "ok" ? "● 数据就绪" : "● 连接异常";
   } catch(e) {
-    const s = document.getElementById("statusText");
-    s.className = "status error";
-    s.textContent = "● 信息服务不可用";
+    document.getElementById("statusText").textContent = "● 连接失败";
   }
   countdown();
 }

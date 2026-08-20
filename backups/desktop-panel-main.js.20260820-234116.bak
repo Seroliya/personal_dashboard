@@ -313,7 +313,7 @@ async function ensureDashboardServer() {
     serverProcess = undefined;
   });
 
-  for (let attempt = 0; attempt < 15; attempt += 1) {
+  for (let attempt = 0; attempt < 90; attempt += 1) {
     if (await dashboardIsReady()) return true;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -480,6 +480,7 @@ function createPanelWindow() {
   });
   panelWindow.setAlwaysOnTop(true, "floating");
   panelWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  panelWindow.loadFile(path.join(__dirname, "loading.html"));
   panelWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^(https?:|mailto:)/i.test(url)) shell.openExternal(url);
     return { action: "deny" };
@@ -557,15 +558,19 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     registerIpc();
-    const dashboardReady = await ensureDashboardServer();
+    createHandleWindow();
     createPanelWindow();
-    if (dashboardReady) {
+    createTray();
+    if (await ensureDashboardServer()) {
       await panelWindow.loadURL(DASHBOARD_URL);
     } else {
-      await panelWindow.loadFile(path.join(PROJECT_DIR, "dashboard.html"));
+      await panelWindow.webContents.executeJavaScript(`
+        document.querySelector(".spinner").style.display = "none";
+        const message = document.getElementById("message");
+        message.className = "error";
+        message.textContent = "仪表盘服务启动失败，请通过托盘菜单退出后重试。";
+      `);
     }
-    createHandleWindow();
-    createTray();
   });
 }
 
