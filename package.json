@@ -1,13 +1,17 @@
 {
   "name": "streaming-dashboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Streaming media data dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "desktop": "electron desktop-panel"
+    "desktop": "electron desktop-panel",
+    "test": "node --test model-usage.test.js workbuddy-usage.test.js activity-watch.test.js runtime-paths.test.js desktop-panel/articles.test.js",
+    "test:ui": "node --test model-usage-ui.test.js activity-watch-ui.test.js desktop-panel/articles-ui.test.js",
+    "package:windows": "node scripts/package-windows.cjs"
   },
   "dependencies": {
+    "ccusage": "20.0.26",
     "marked": "^15.0.12",
     "playwright": "^1.45.0",
     "playwright-extra": "^4.3.6",

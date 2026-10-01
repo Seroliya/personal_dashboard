@@ -1,0 +1,20 @@
+{
+  "codex": {
+    "defaults": {
+      "pricingOverrides": {
+        "gpt-6.1-sol": {
+          "inputCostPerToken": 0.000002,
+          "cacheReadInputTokenCost": 0.0000001,
+          "cacheCreationInputTokenCost": 0.0000025,
+          "outputCostPerToken": 0.00001,
+          "inputCostPerTokenAbove200kTokens": 0.000004,
+          "cacheReadInputTokenCostAbove200kTokens": 0.0000002,
+          "cacheCreationInputTokenCostAbove200kTokens": 0.000005,
+          "outputCostPerTokenAbove200kTokens": 0.000015,
+          "fastMultiplier": 2,
+          "maxInputTokens": 1000000
+        }
+      }
+    }
+  }
+}

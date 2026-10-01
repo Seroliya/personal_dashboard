@@ -1,0 +1,237 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { ArticleLibrary, DAY_MS, dayKey } = require("./articles");
+
+test("refresh rescans immediately, replaces the batch, and preserves the daily task", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-refresh-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const root = path.join(dir, "library");
+  fs.mkdirSync(root);
+  let now = Date.parse("2026-09-05T12:00:00+08:00");
+  const stateFile = path.join(dir, "state.json");
+  const library = new ArticleLibrary(stateFile, () => now, () => 0.4);
+  const settings = { articleDirectory: root, dailyArticleCount: 2 };
+  for (let i = 1; i <= 6; i++) fs.writeFileSync(path.join(root, `article-${i}.md`), `# ${i}`);
+  const first = library.list(settings);
+  assert.equal(first.taskCompleted, false);
+  const opened = first.articles[0].id;
+  library.read(opened, settings);
+  // The clock does not advance: updates must bypass the old one-minute cache.
+  const moved = path.join(root, "new-folder");
+  fs.mkdirSync(moved);
+  fs.renameSync(library.get(opened, settings).file, path.join(moved, `${opened}.md`));
+  assert.equal(library.read(opened, settings).folder, "new-folder");
+  fs.unlinkSync(library.get(opened, settings).file);
+  library.complete(opened, settings);
+  fs.writeFileSync(path.join(root, "article-7.md"), "# new");
+  const refreshed = library.list(settings, { refresh: true });
+  assert.equal(refreshed.total, 6);
+  assert.equal(refreshed.taskCompleted, false);
+  assert.equal(refreshed.completedCount, 1);
+  assert.equal(refreshed.articles.some(item => first.articles.some(old => old.id === item.id)), false);
+  assert.equal(refreshed.articles.some(item => item.done), false);
+  const restarted = new ArticleLibrary(stateFile, () => now, () => 0.4);
+  assert.deepEqual(restarted.list(settings), refreshed);
+  restarted.complete(refreshed.articles[0].id, settings);
+  restarted.complete(refreshed.articles[0].id, settings);
+  assert.equal(restarted.list(settings).completedCount, 2);
+  assert.equal(restarted.list(settings, { refresh: true }).taskCompleted, true);
+  now += DAY_MS;
+  assert.equal(restarted.list(settings).taskCompleted, false);
+  const saved = fs.readFileSync(stateFile, "utf8");
+  fs.renameSync(root, root + "-offline");
+  assert.throws(() => restarted.list(settings, { refresh: true }));
+  assert.equal(fs.readFileSync(stateFile, "utf8"), saved);
+  fs.renameSync(root + "-offline", root);
+  assert.equal(restarted.list(settings).articles.length, 2);
+});
+
+test("renamed Markdown keeps identity via metadata or content, and legacy history migrates", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-identity-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const root = path.join(dir, "library");
+  fs.mkdirSync(root);
+  const stateFile = path.join(dir, "state.json");
+  const library = new ArticleLibrary(stateFile);
+  const settings = { articleDirectory: root };
+  fs.writeFileSync(path.join(root, "旧标题.md"), "# 普通文章");
+  fs.writeFileSync(path.join(root, "新标题.md"), '---\nzhihu_id: "answer-123"\n---\n正文');
+  const legacyId = require("crypto").createHash("sha256").update("旧标题.md").digest("hex");
+  fs.writeFileSync(stateFile, JSON.stringify({ read: { [legacyId]: Date.now() },
+    daily: { date: dayKey(Date.now()), root: fs.realpathSync(root), ids: [legacyId] } }));
+  const first = library.list(settings);
+  const generic = [...library.catalog.values()].find(item => item.id.startsWith("content-"));
+  assert.equal(library.load().read[generic.id] > 0, true);
+  fs.renameSync(generic.file, path.join(root, "移动后改名.md"));
+  const next = library.list(settings);
+  assert.deepEqual(next.articles.map(item => item.id), first.articles.map(item => item.id));
+  assert.equal(next.articles.find(item => item.id === generic.id).done, true);
+  assert.equal(next.articles.some(item => item.id === "answer-123"), true);
+  assert.equal(library.list(settings, { refresh: true }).articles.length, 1);
+});
+
+test("automatic scan replaces deleted recommendations without reshuffling survivors", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-sync-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const library = new ArticleLibrary(path.join(dir, "state.json"));
+  const settings = { articleDirectory: dir, dailyArticleCount: 2 };
+  fs.writeFileSync(path.join(dir, "article-1.md"), "1");
+  fs.writeFileSync(path.join(dir, "article-2.md"), "2");
+  const first = library.list(settings);
+  fs.unlinkSync(library.get(first.articles[0].id, settings).file);
+  fs.writeFileSync(path.join(dir, "article-3.md"), "3");
+  const next = library.list(settings);
+  assert.deepEqual(next.articles.map(item => item.id), [first.articles[1].id, "article-3"]);
+  library.complete(first.articles[1].id, settings);
+  library.complete("article-3", settings);
+  const refreshed = library.list(settings, { refresh: true });
+  assert.equal(refreshed.articles.length, 0);
+  assert.equal(refreshed.taskCompleted, true);
+});
+
+test("default daily task requires four distinct articles across refreshed batches", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-daily-goal-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  for (let i = 1; i <= 12; i++) fs.writeFileSync(path.join(dir, `article-${i}.md`), String(i));
+  const library = new ArticleLibrary(path.join(dir, "state.json"));
+  const settings = { articleDirectory: dir };
+  for (let completed = 1; completed <= 4; completed++) {
+    const item = library.list(settings, { refresh: true }).articles[0];
+    library.complete(item.id, settings);
+    library.complete(item.id, settings);
+    const result = library.list(settings);
+    assert.equal(result.completedCount, completed);
+    assert.equal(result.taskCompleted, completed === 4);
+  }
+  assert.equal(new ArticleLibrary(path.join(dir, "state.json")).list(settings, { refresh: true }).taskCompleted, true);
+  const smallerBatch = library.list({ ...settings, articleBatchCount: 2, dailyArticleGoal: 4 });
+  assert.equal(smallerBatch.articles.length, 2);
+  assert.equal(smallerBatch.dailyGoal, 4);
+  assert.equal(smallerBatch.taskCompleted, true);
+  const higherGoal = library.list({ ...settings, articleBatchCount: 2, dailyArticleGoal: 8 });
+  assert.deepEqual(higherGoal.articles, smallerBatch.articles);
+  assert.equal(higherGoal.completedCount, 4);
+  assert.equal(higherGoal.taskCompleted, false);
+});
+
+test("daily selection, count changes, cooldown boundary, deduplication and favorite persistence", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-articles-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const root = path.join(dir, "library");
+  fs.mkdirSync(path.join(root, "a"), { recursive: true });
+  fs.mkdirSync(path.join(root, "b"));
+  for (let i = 1; i <= 8; i++) fs.writeFileSync(path.join(root, "a", `标题 - article-${i}.md`), "# hello");
+  fs.writeFileSync(path.join(root, "b", "duplicate - article-1.md"), "# hello");
+  fs.writeFileSync(path.join(root, "a", "_目录.md"), "index");
+  fs.writeFileSync(path.join(root, "a", "photo.jpg"), "image");
+  let now = Date.parse("2026-09-05T12:00:00+08:00");
+  const stateFile = path.join(dir, "state.json");
+  const library = new ArticleLibrary(stateFile, () => now, () => 0.4);
+  const settings = { articleDirectory: root, dailyArticleCount: 4 };
+  const first = library.list(settings);
+  assert.equal(first.total, 8);
+  assert.equal(first.articles.length, 4);
+  assert.deepEqual(library.list(settings), first);
+  const readId = first.articles[0].id;
+  library.complete(readId, settings);
+  const original = library.get(readId, settings).file;
+  library.favorite(readId, settings);
+  assert.equal(fs.existsSync(original), false);
+  assert.equal(path.basename(library.get(readId, settings).file).startsWith("⭐"), true);
+  library.favorite(readId, settings);
+  assert.equal(path.basename(library.get(readId, settings).file).startsWith("⭐⭐"), false);
+  const restart = new ArticleLibrary(stateFile, () => now, () => 0.4);
+  assert.equal(restart.list(settings).articles.find(item => item.id === readId).done, true);
+  assert.equal(restart.list(settings).articles.find(item => item.id === readId).favorite, true);
+  assert.equal(library.list({ ...settings, dailyArticleCount: 2 }).articles.length, 2);
+  assert.deepEqual(library.list(settings).articles.map(item => item.id), first.articles.map(item => item.id));
+  assert.equal(library.list({ ...settings, dailyArticleCount: 6 }).articles.length, 6);
+  now += DAY_MS;
+  assert.equal(library.list({ ...settings, dailyArticleCount: 20 }).articles.length, 7);
+  assert.equal(library.list({ ...settings, dailyArticleCount: 20 }).articles.some(item => item.id === readId), false);
+  now += 89 * DAY_MS;
+  assert.equal(library.list({ ...settings, dailyArticleCount: 20 }).articles.length, 8);
+  assert.equal(library.list({ ...settings, dailyArticleCount: 20 }).articles.find(item => item.id === readId).done, false);
+  assert.throws(() => library.read("../../outside", settings));
+  fs.writeFileSync(stateFile, "broken");
+  assert.throws(() => library.list(settings));
+});
+
+test("missing directory and rename collision leave files intact", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-articles-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const library = new ArticleLibrary(path.join(dir, "state.json"));
+  const settings = { articleDirectory: dir };
+  assert.throws(() => library.list({ articleDirectory: path.join(dir, "missing") }));
+  fs.writeFileSync(path.join(dir, "test.md"), "original");
+  const item = library.list(settings).articles[0];
+  fs.writeFileSync(path.join(dir, "⭐test.md"), "existing");
+  assert.throws(() => library.favorite(item.id, settings), /已存在/);
+  assert.equal(fs.readFileSync(path.join(dir, "test.md"), "utf8"), "original");
+  assert.equal(fs.readFileSync(path.join(dir, "⭐test.md"), "utf8"), "existing");
+});
+
+test("archive keeps folder and favorite name, excludes duplicate IDs permanently and preserves daily progress", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-archive-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const root = path.join(dir, "library");
+  fs.mkdirSync(path.join(root, "topic"), { recursive: true });
+  fs.writeFileSync(path.join(root, "topic", "文章 - article-100.md"), "content");
+  fs.writeFileSync(path.join(root, "duplicate - article-100.md"), "content");
+  fs.writeFileSync(path.join(root, "article-101.md"), "other");
+  fs.mkdirSync(path.join(root, "已归档"));
+  fs.writeFileSync(path.join(root, "已归档", "article-200.md"), "manually archived");
+  const stateFile = path.join(dir, "state.json");
+  let now = Date.now();
+  const settings = { articleDirectory: root };
+  const library = new ArticleLibrary(stateFile, () => now);
+  library.list(settings);
+  library.catalog.get("article-100").file = path.join(root, "topic", "文章 - article-100.md");
+  library.read("article-100", settings);
+  library.complete("article-100", settings);
+  library.favorite("article-100", settings);
+  assert.deepEqual(library.archive("article-100", settings), { id: "article-100", archived: true });
+  assert.equal(fs.readFileSync(path.join(root, "已归档", "topic", "⭐文章 - article-100.md"), "utf8"), "content");
+  assert.equal(fs.existsSync(path.join(root, "topic", "⭐文章 - article-100.md")), false);
+  assert.equal(library.list(settings).completedCount, 1);
+  assert.deepEqual(library.list(settings, { refresh: true }).articles.map(item => item.id), ["article-101"]);
+  assert.throws(() => library.complete("article-100", settings), /已归档/);
+  now += 91 * DAY_MS;
+  const restarted = new ArticleLibrary(stateFile, () => now);
+  assert.deepEqual(restarted.list(settings, { refresh: true }).articles.map(item => item.id), ["article-101"]);
+});
+
+test("archive does not mark unread articles completed and never overwrites a collision", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-archive-collision-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, "article-1.md"), "original");
+  const library = new ArticleLibrary(path.join(dir, "state.json"));
+  const settings = { articleDirectory: dir };
+  library.list(settings);
+  fs.mkdirSync(path.join(dir, "已归档"));
+  fs.writeFileSync(path.join(dir, "已归档", "article-1.md"), "existing");
+  assert.throws(() => library.archive("article-1", settings), /同名/);
+  assert.equal(fs.readFileSync(path.join(dir, "article-1.md"), "utf8"), "original");
+  assert.equal(fs.readFileSync(path.join(dir, "已归档", "article-1.md"), "utf8"), "existing");
+  fs.unlinkSync(path.join(dir, "已归档", "article-1.md"));
+  library.archive("article-1", settings);
+  assert.equal(library.list(settings).completedCount, 0);
+  assert.equal(library.list(settings).articles.length, 0);
+});
+
+test("archive rolls back the file move when history cannot be saved", t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-archive-rollback-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, "article-1.md");
+  fs.writeFileSync(file, "original");
+  const library = new ArticleLibrary(path.join(dir, "state.json"));
+  const settings = { articleDirectory: dir };
+  library.list(settings);
+  library.save = () => { throw new Error("history unavailable"); };
+  assert.throws(() => library.archive("article-1", settings), /history unavailable/);
+  assert.equal(fs.readFileSync(file, "utf8"), "original");
+  assert.equal(fs.existsSync(path.join(dir, "已归档", "article-1.md")), false);
+});

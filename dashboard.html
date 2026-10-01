@@ -17,7 +17,7 @@
     padding: 40px 20px;
   }
   .container { max-width: 900px; width: 100%; }
-  .header { margin-bottom: 20px; text-align: center; }
+  .header { position: relative; margin-bottom: 20px; text-align: center; }
   .header h1 { font-size: 22px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
   .header .meta { font-size: 12px; color: #999; }
   .mode-tabs {
@@ -51,6 +51,49 @@
   .status { color: #52c41a; }
   .status.starting { color: #d48806; }
   .status.error { color: #ff4d4f; }
+  .settings-button {
+    position: absolute;
+    top: -7px;
+    right: 0;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #e7e7e7;
+    border-radius: 9px;
+    background: #fff;
+    color: #777;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .04);
+  }
+  .settings-button:hover,
+  .settings-button.active { color: #4f46e5; border-color: #d9d7ff; background: #f7f6ff; }
+  .settings-panel {
+    position: absolute;
+    z-index: 20;
+    top: 35px;
+    right: 0;
+    width: min(340px, 100%);
+    padding: 14px;
+    border: 1px solid #e7e7e7;
+    border-radius: 12px;
+    background: #fff;
+    text-align: left;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .12);
+  }
+  .settings-title { margin-bottom: 9px; color: #333; font-size: 14px; font-weight: 600; }
+  .setting-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 0;
+    border-top: 1px solid #f1f1f1;
+  }
+  .setting-label { color: #444; font-size: 13px; line-height: 1.35; }
+  .setting-description { margin-top: 3px; color: #999; font-size: 11px; line-height: 1.4; }
+  .setting-toggle { width: 17px; height: 17px; margin-top: 2px; flex: 0 0 auto; accent-color: #4f46e5; }
+  .setting-error { min-height: 16px; margin-top: 5px; color: #ff4d4f; font-size: 11px; }
 
   .row {
     display: flex;
@@ -83,15 +126,59 @@
   .dot.todo { background: #faad14; }
   .dot.weather { background: #13a8a8; }
 
-  .metrics { display: flex; gap: 16px; }
-  .metric { flex: 1; text-align: center; }
-  .metric-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
-  .zhihu .metric-value { color: #06f; }
-  .bili .metric-value { color: #fb7299; }
-  .deepseek .metric-value { color: #4f46e5; }
-  .deepseek #dsTokens { font-size: 24px; white-space: nowrap; }
-
-  .metric-label { font-size: 12px; color: #999; margin-top: 2px; }
+  body:has(#summaryMode:not([hidden])) { padding: 20px 16px; }
+  body:has(#summaryMode:not([hidden])) .header { margin-bottom: 12px; }
+  #summaryMode .row { display: block; margin-bottom: 0; }
+  #summaryMode .card { padding: 12px 0; border: 0; border-bottom: 1px solid #eee; border-radius: 0; background: transparent; }
+  #summaryMode .card:last-child { border-bottom: 0; }
+  #summaryMode .row .card { border-bottom: 1px solid #eee; }
+  #summaryMode .card-title { margin-bottom: 8px; font-size: 13px; }
+  .platform-summary { padding: 4px 0 8px; border-bottom: 1px solid #eee; }
+  .platform-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
+  .platform-heading { display: flex; align-items: center; gap: 5px; flex: 0 0 82px; color: #555; font-size: 12px; font-weight: 600; }
+  .platform-metrics { display: flex; flex: 1; justify-content: space-between; gap: 10px; min-width: 0; font-size: 12px; color: #888; }
+  .platform-metric { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+  .platform-metric strong { color: #333; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  @media (max-width: 400px) {
+    .platform-row { display: block; }
+    .platform-heading { margin-bottom: 5px; }
+  }
+  .usage-card { min-width: 0; }
+  .usage-heading { justify-content: space-between; margin-bottom: 12px; }
+  .usage-legend { display: flex; gap: 16px; font-size: 11px; color: #777; }
+  .usage-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .usage-swatch { width: 8px; height: 8px; border-radius: 2px; background: #4f46e5; }
+  .usage-swatch.codex { background: #14a38b; }
+  .usage-swatch.workbuddy { background: #ec4899; }
+  .usage-totals { display: flex; gap: 12px; margin: 12px 0 14px; }
+  .usage-total { flex: 1; min-width: 0; font-size: 11px; color: #888; }
+  .usage-total strong { display: block; margin-bottom: 3px; color: #4f46e5; font-size: 19px; font-weight: 650; }
+  .usage-total.codex strong { color: #148d79; }
+  .usage-total.workbuddy strong { color: #db2777; }
+  .usage-total small { display: block; margin-top: 4px; font-size: 10px; line-height: 1.4; }
+  .usage-chart { position: relative; height: 175px; padding: 5px 0 0 43px; }
+  .usage-grid { position: absolute; inset: 5px 0 25px 43px; pointer-events: none; }
+  .usage-gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed #e5e7eb; }
+  .usage-gridline span { position: absolute; right: calc(100% + 7px); top: -6px; color: #999; font-size: 9px; white-space: nowrap; }
+  .usage-columns { height: 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .usage-day { min-width: 0; display: flex; flex-direction: column; }
+  .usage-bars { flex: 1; display: flex; align-items: flex-end; justify-content: center; position: relative; z-index: 1; }
+  .usage-bar-target { height: 100%; flex: 1; max-width: 28px; min-width: 0; background: none; border: 0; display: flex; flex-direction: column-reverse; justify-content: flex-start; cursor: pointer; border-radius: 4px; }
+  .usage-bar-target:focus-visible { outline: 2px solid #aaa; outline-offset: 2px; }
+  .usage-bar { width: 100%; flex-shrink: 0; background: #4f46e5; border-radius: 0 0 3px 3px; opacity: .85; }
+  .usage-bar.codex { background: #14a38b; }
+  .usage-bar.workbuddy { background: #ec4899; border-radius: 3px 3px 0 0; }
+  .usage-bar-target:hover .usage-bar, .usage-bar-target:focus .usage-bar { opacity: 1; }
+  .usage-bar.missing { height: 4px; background: repeating-linear-gradient(135deg, #ddd 0 2px, transparent 2px 4px); }
+  .usage-date { height: 25px; padding-top: 7px; text-align: center; font-size: 10px; color: #888; white-space: nowrap; }
+  .usage-date.today { color: #444; font-weight: 600; }
+  .usage-status { margin-top: 5px; font-size: 10px; color: #b7791f; line-height: 1.5; }
+  .usage-tooltip { position: fixed; z-index: 50; width: 255px; max-width: calc(100vw - 16px); padding: 12px 14px; border: 1px solid #e7e7ee; border-radius: 9px; background: #fff; box-shadow: 0 6px 24px #0002; pointer-events: none; font-size: 11px; color: #666; }
+  .usage-tooltip[hidden] { display: none; }
+  .usage-tooltip-title { margin-bottom: 9px; font-weight: 600; color: #333; }
+  .usage-tooltip-row { display: flex; justify-content: space-between; gap: 8px; margin: 5px 0; }
+  .usage-tooltip-row strong { font-variant-numeric: tabular-nums; color: #333; }
+  .usage-tooltip-note { margin-top: 8px; line-height: 1.5; color: #999; }
 
   .tag {
     font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500;
@@ -101,25 +188,17 @@
   .tag.month { background: #ede9fe; color: #6d28d9; }
   .tag.all { background: #f0f0f0; color: #666; }
 
-  .todo-card { max-height: 500px; display: flex; flex-direction: column; min-width: 0; }
-  .todo-list { overflow-y: auto; flex: 1; font-size: 13px; min-height: 0; }
-  .todo-list::-webkit-scrollbar { width: 5px; }
-  .todo-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
-  .todo-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
-  .todo-item:last-child { border-bottom: none; }
-  .todo-item input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; accent-color: #06f; cursor: pointer; }
-  .todo-item.done .todo-text { text-decoration: line-through; color: #bbb; }
-  .todo-text { line-height: 1.4; word-break: break-word; }
-  .todo-text code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
-  .todo-text a { color: #06f; text-decoration: none; }
-  .todo-text a:hover { text-decoration: underline; }
-  .todo-text strong { font-weight: 600; }
-  .todo-section { font-size: 11px; color: #aaa; margin-top: 10px; margin-bottom: 2px; font-weight: 600; border-top: 1px solid #f0f0f0; padding-top: 8px; }
-  .todo-section:first-child { margin-top: 0; border-top: none; }
-  .todo-empty { text-align: center; color: #ccc; padding: 20px 0; font-size: 14px; }
-  .todo-filename { font-size: 11px; color: #bbb; margin-bottom: 8px; }
-  .todo-toolbar { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
-  .collapse-button {
+  .markdown-toolbar { display: flex; align-items: center; gap: 10px; margin: -4px 0 10px; }
+  .markdown-file {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    color: #999;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .secondary-button {
     border: 1px solid #e5e5e5;
     border-radius: 8px;
     padding: 6px 10px;
@@ -129,21 +208,137 @@
     cursor: pointer;
     transition: color .15s ease, border-color .15s ease, background .15s ease;
   }
-  .collapse-button:hover { color: #333; border-color: #ccc; background: #fafafa; }
-  .todos-collapsed .todo-list,
-  .todos-collapsed .todo-filename { display: none; }
-  .todos-collapsed .todo-card { max-height: none; }
+  .secondary-button:hover { color: #333; border-color: #ccc; background: #fafafa; }
+  .secondary-button:disabled { opacity: .55; cursor: wait; }
+  .summary-toolbar { display: flex; justify-content: flex-end; margin: 0 0 2px; }
+  .summary-toolbar .secondary-button { padding: 3px 0 3px 8px; border: 0; background: transparent; font-size: 11px; }
+  #summaryMode .usage-totals { margin: 8px 0 10px; }
+  #summaryMode .usage-total strong { font-size: 17px; }
+  #summaryMode .usage-chart { height: 145px; }
+  #summaryMode .usage-status:empty,
+  #summaryMode .weather-error:empty,
+  #summaryMode .setting-error:empty { display: none; }
+  #summaryMode .article-row { padding: 8px 0; }
+  #summaryMode .article-hint { margin: 4px 0; }
+  .markdown-card { min-height: 300px; padding: 18px 22px; }
+  .markdown-document { overflow-wrap: anywhere; color: #333; font-size: 13px; line-height: 1.65; }
+  .markdown-document h1,
+  .markdown-document h2,
+  .markdown-document h3,
+  .markdown-document h4 { margin: 1.1em 0 .55em; color: #222; line-height: 1.3; }
+  .markdown-document h1:first-child,
+  .markdown-document h2:first-child { margin-top: 0; }
+  .markdown-document h1 { font-size: 21px; }
+  .markdown-document h2 { padding-bottom: 5px; border-bottom: 1px solid #ececec; font-size: 18px; }
+  .markdown-document h3 { font-size: 15px; }
+  .markdown-document p { margin: .55em 0; }
+  .markdown-document ul,
+  .markdown-document ol { margin: .45em 0 .65em; padding-left: 1.7em; }
+  .markdown-document li { margin: .2em 0; }
+  .markdown-document li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.4em; }
+  .markdown-document input[type="checkbox"] { margin-right: 7px; accent-color: #4f46e5; cursor: pointer; }
+  .markdown-document blockquote { margin: .7em 0; padding: 5px 12px; border-left: 3px solid #d9d7ff; color: #777; background: #f8f7ff; }
+  .markdown-document code { padding: 1px 4px; border-radius: 4px; background: #eee; font-family: Consolas, monospace; font-size: 12px; }
+  .markdown-document pre { overflow-x: auto; margin: .7em 0; padding: 11px; border-radius: 8px; background: #202124; color: #f5f5f5; }
+  .markdown-document pre code { padding: 0; background: transparent; color: inherit; }
+  .markdown-document a { color: #4f46e5; text-decoration: none; }
+  .markdown-document a:hover { text-decoration: underline; }
+  .markdown-document table { display: block; overflow-x: auto; width: 100%; margin: .7em 0; border-collapse: collapse; }
+  .markdown-document th,
+  .markdown-document td { padding: 6px 9px; border: 1px solid #ddd; }
+  .markdown-empty { padding: 40px 10px; color: #aaa; text-align: center; }
+  .markdown-error { min-height: 16px; margin: -5px 0 8px; color: #ff4d4f; font-size: 11px; }
 
   .weather-card { width: 100%; }
-  .weather-layout { display: grid; grid-template-columns: 1fr 1.35fr; gap: 12px; }
-  .weather-block { min-width: 0; text-align: center; padding: 4px 8px; }
+  .weather-title { justify-content: space-between; gap: 10px; }
+  .weather-title-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .weather-city-controls { position: relative; display: flex; align-items: center; gap: 5px; margin-left: auto; }
+  .weather-city-select {
+    min-width: 92px;
+    max-width: 150px;
+    height: 24px;
+    border: 0;
+    border-radius: 4px;
+    padding: 0 4px;
+    background: transparent;
+    color: #555;
+    font-size: 11px;
+  }
+  .weather-icon-button {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #666;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .weather-icon-button:hover { background: #effafa; color: #13a8a8; }
+  .weather-city-menu { position: absolute; right: 0; top: 29px; z-index: 16; width: 150px; padding: 4px; border: 1px solid #e7e7e7; border-radius: 7px; background: #fff; box-shadow: 0 5px 16px #0001; }
+  .weather-city-menu[hidden], .weather-city-adder[hidden] { display: none; }
+  .weather-menu-action { display: block; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: #555; text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
+  .weather-menu-action:hover { background: #effafa; color: #13a8a8; }
+  .weather-menu-action:disabled { color: #bbb; cursor: not-allowed; }
+  .weather-city-adder {
+    position: relative;
+    display: flex;
+    gap: 7px;
+    margin: 4px 0 10px;
+  }
+  .weather-city-input {
+    min-width: 0;
+    flex: 1;
+    height: 34px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+  }
+  .weather-city-input:focus { border-color: #13a8a8; }
+  .weather-search-results {
+    position: absolute;
+    z-index: 15;
+    top: 39px;
+    left: 0;
+    right: 0;
+    overflow-y: auto;
+    max-height: 190px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+  }
+  .weather-search-result {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 9px;
+    background: transparent;
+    color: #444;
+    text-align: left;
+    cursor: pointer;
+  }
+  .weather-search-result:hover { background: #effafa; }
+  .weather-search-result span:last-child { color: #999; font-size: 10px; }
+  .weather-search-empty { padding: 10px; color: #999; font-size: 11px; text-align: center; }
+  .weather-error { margin-top: 5px; color: #d4380d; font-size: 10px; text-align: right; }
+  .weather-layout { display: grid; grid-template-columns: 1fr 1.3fr; gap: 10px; }
+  .weather-block { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 2px 0; }
   .weather-block + .weather-block { border-left: 1px solid #eee; }
-  .weather-kicker { color: #999; font-size: 11px; margin-bottom: 4px; }
-  .weather-current { color: #13a8a8; font-size: 32px; font-weight: 700; line-height: 1.1; }
-  .weather-condition { color: #555; font-size: 14px; font-weight: 600; margin-top: 4px; }
-  .weather-block.current .weather-condition { margin: 0 0 6px; }
-  .weather-range { color: #333; font-size: 22px; font-weight: 700; margin-top: 5px; white-space: nowrap; }
-  .weather-source { color: #bbb; font-size: 10px; margin-top: 10px; text-align: right; }
+  .weather-block + .weather-block { padding-left: 10px; }
+  .weather-kicker { color: #999; font-size: 10px; white-space: nowrap; }
+  .weather-current { color: #13a8a8; font-size: 22px; font-weight: 650; line-height: 1.1; white-space: nowrap; }
+  .weather-condition { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #555; font-size: 12px; }
+  .weather-range { color: #333; font-size: 16px; font-weight: 600; white-space: nowrap; }
+  .weather-source { color: #bbb; font-size: 9px; margin-top: 6px; text-align: right; }
 
   .chat-mode {
     height: calc(100vh - 132px);
@@ -166,6 +361,8 @@
     padding: 0 2px 12px;
     border-bottom: 1px solid #eee;
   }
+  .chat-status-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; }
+  .lmstudio-manual-button { padding: 5px 8px; font-size: 11px; white-space: nowrap; }
   .chat-model-select {
     min-width: 0;
     max-width: 245px;
@@ -353,6 +550,48 @@
 
   .footer { margin-top: 20px; font-size: 11px; color: #bbb; }
 
+  .article-row { display: flex; align-items: flex-start; gap: 9px; padding: 11px 0; border-bottom: 1px solid #eee; }
+  .article-row:last-child { border-bottom: 0; }
+  .article-open { flex: 1; border: 0; background: none; text-align: left; color: #333; cursor: pointer; font: inherit; line-height: 1.5; overflow-wrap: anywhere; }
+  .article-row.done .article-title { text-decoration: line-through; color: #999; }
+  .article-folder { display: block; color: #999; font-size: 11px; margin-top: 4px; }
+  .article-check { color: #4f46e5; padding-top: 3px; }
+  .article-star { border: 0; background: transparent; cursor: pointer; font-size: 20px; color: #aaa; }
+  .article-star:disabled { cursor: default; }
+  .article-archive { width: 25px; height: 29px; display: grid; place-items: center; border: 0; background: none; color: #999; cursor: pointer; flex-shrink: 0; }
+  .article-archive:hover { color: #4f46e5; background: #f5f4ff; border-radius: 5px; }
+  .article-archive:disabled { cursor: default; opacity: .5; }
+  .article-hint { color: #888; font-size: 11px; line-height: 1.5; margin: 8px 0; overflow-wrap: anywhere; }
+  .article-reader { margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
+  .article-reader .markdown-document { max-height: 60vh; overflow-y: auto; padding-right: 8px; }
+  .article-reader img { max-width: 100%; height: auto; }
+  .article-number { width: 65px; padding: 4px; border: 1px solid #ddd; border-radius: 5px; }
+  #todoMode #articlesCard { margin-top: 14px; padding: 14px 16px; }
+  #todoMode .setting-error:empty { display: none; }
+  #todoMode .markdown-card { min-height: 120px; }
+  .activity-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+  .activity-date-controls { display: flex; align-items: center; gap: 6px; }
+  .activity-date { width: 128px; padding: 5px; border: 1px solid #eee; border-radius: 5px; background: #fff; font: inherit; font-size: 12px; color: #555; }
+  .activity-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #eee; }
+  .activity-value { display: block; font-size: 21px; font-weight: 600; color: #4f46e5; }
+  .activity-label { font-size: 11px; color: #999; }
+  .activity-section { padding: 14px 0; border-bottom: 1px solid #eee; }
+  .activity-title { color: #555; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .activity-chart { display: flex; align-items: flex-end; gap: 6px; height: 95px; }
+  .activity-column { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; flex: 1; height: 100%; min-width: 0; }
+  .activity-bar { width: 65%; max-width: 30px; border-radius: 3px 3px 0 0; background: #938df0; min-height: 0; }
+  .activity-column.selected .activity-bar { background: #4f46e5; }
+  .activity-tick { height: 20px; padding-top: 5px; font-size: 9px; color: #999; white-space: nowrap; }
+  .activity-hours { gap: 3px; height: 80px; }
+  .activity-hours .activity-bar { width: 100%; background: #14a38b; }
+  .activity-app-row { margin: 10px 0; }
+  .activity-app-heading { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; margin-bottom: 5px; }
+  .activity-app-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .activity-app-duration { flex-shrink: 0; color: #888; font-variant-numeric: tabular-nums; }
+  .activity-app-track { height: 4px; background: #f3f2fd; border-radius: 3px; }
+  .activity-app-fill { height: 100%; background: #938df0; border-radius: 3px; }
+  .activity-empty { color: #999; font-size: 12px; padding: 12px 0; }
+  #activityMode .setting-error:empty { display: none; }
 </style>
 </head>
 <body>
@@ -360,6 +599,30 @@
 <div class="container">
 <div class="header">
   <h1>personal_dashboard</h1>
+  <button class="settings-button" id="settingsButton" type="button" aria-label="设置" aria-expanded="false">⚙</button>
+  <div class="settings-panel" id="settingsPanel" hidden>
+    <div class="settings-title">设置</div>
+    <label class="setting-row">
+      <span>
+        <span class="setting-label">开机自动启动应用</span>
+        <span class="setting-description">登录 Windows 后自动启动桌面悬浮窗</span>
+      </span>
+      <input class="setting-toggle" id="launchAtLoginSetting" type="checkbox">
+    </label>
+    <label class="setting-row">
+      <span>
+        <span class="setting-label">自动启动 LM Studio 与本地模型</span>
+        <span class="setting-description">进入本地对话时自动启动；关闭后使用对话页里的手动按钮</span>
+      </span>
+      <input class="setting-toggle" id="autoStartLmStudioSetting" type="checkbox">
+    </label>
+    <label class="setting-row"><span class="setting-label">一次推荐篇数</span><input class="article-number" id="articleBatchCountSetting" type="number" min="1" max="50" value="4"></label>
+    <label class="setting-row"><span class="setting-label">每日目标篇数</span><input class="article-number" id="dailyArticleGoalSetting" type="number" min="1" max="50" value="4"></label>
+    <label class="setting-row"><span class="setting-label">读完判定（秒）</span><input class="article-number" id="articleReadSecondsSetting" type="number" min="1" max="3600" value="30"></label>
+    <div class="article-hint" id="articleDirectoryLabel"></div>
+    <button class="secondary-button" id="chooseArticleDirectoryButton" type="button">更换文章目录</button>
+    <div class="setting-error" id="settingsError"></div>
+  </div>
   <div class="meta">
     <span class="status starting" id="statusText">● 信息服务启动中</span>
     &nbsp;·&nbsp;
@@ -368,102 +631,132 @@
   <nav class="mode-tabs" aria-label="页面切换">
     <button class="mode-button active" id="summaryModeButton" type="button" aria-selected="true">信息总结</button>
     <button class="mode-button" id="todoModeButton" type="button" aria-selected="false">日常待办</button>
+    <button class="mode-button" id="activityModeButton" type="button" aria-selected="false">电脑使用</button>
     <button class="mode-button" id="modeButton" type="button" aria-selected="false">对话模式</button>
   </nav>
 </div>
 
 <main id="summaryMode">
-<div class="row">
-  <div class="card zhihu">
-    <div class="card-title"><span class="dot zhihu"></span> 知乎 <span class="tag today">今日</span></div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-value" id="zhihuReads">--</div>
-        <div class="metric-label">阅读量</div>
-      </div>
-      <div class="metric">
-        <div class="metric-value" id="zhihuLikes">--</div>
-        <div class="metric-label">赞同</div>
-      </div>
-      <div class="metric">
-        <div class="metric-value" id="zhihuCollects">--</div>
-        <div class="metric-label">收藏</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card bili">
-    <div class="card-title"><span class="dot bili"></span> B站 <span class="tag yesterday">昨日</span></div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-value" id="biliPlays">--</div>
-        <div class="metric-label">播放量</div>
-      </div>
-      <div class="metric">
-        <div class="metric-value" id="biliLikes">--</div>
-        <div class="metric-label">点赞</div>
-      </div>
-      <div class="metric">
-        <div class="metric-value" id="biliCollects">--</div>
-        <div class="metric-label">收藏</div>
-      </div>
-    </div>
-  </div>
+<div class="summary-toolbar">
+  <button class="secondary-button" id="refreshInformationButton" type="button">更新数据</button>
 </div>
+<section class="platform-summary" aria-label="创作平台数据">
+  <div class="platform-row zhihu">
+    <div class="platform-heading"><span class="dot zhihu"></span>知乎 <span class="tag today">今日</span></div>
+    <div class="platform-metrics">
+      <span class="platform-metric">阅读量 <strong id="zhihuReads">--</strong></span>
+      <span class="platform-metric">赞同 <strong id="zhihuLikes">--</strong></span>
+      <span class="platform-metric">收藏 <strong id="zhihuCollects">--</strong></span>
+    </div>
+  </div>
+  <div class="platform-row bili">
+    <div class="platform-heading"><span class="dot bili"></span>B站 <span class="tag yesterday">昨日</span></div>
+    <div class="platform-metrics">
+      <span class="platform-metric">播放量 <strong id="biliPlays">--</strong></span>
+      <span class="platform-metric">点赞 <strong id="biliLikes">--</strong></span>
+      <span class="platform-metric">收藏 <strong id="biliCollects">--</strong></span>
+    </div>
+  </div>
+</section>
 
 <div class="row">
-  <div class="card deepseek">
-    <div class="card-title"><span class="dot ds"></span> DeepSeek <span class="tag month">近30天</span></div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-value" id="dsTokens">--</div>
-        <div class="metric-label">Tokens</div>
-      </div>
-      <div class="metric">
-        <div class="metric-value" id="dsCost">--</div>
-        <div class="metric-label">消费金额</div>
-      </div>
+  <div class="card usage-card" id="modelUsageCard">
+    <div class="card-title usage-heading"><span>模型用量</span><span class="tag month">近 7 天</span></div>
+    <div class="usage-legend"><span><i class="usage-swatch"></i>DeepSeek</span><span><i class="usage-swatch codex"></i>Codex</span><span><i class="usage-swatch workbuddy"></i>WorkBuddy</span></div>
+    <div class="usage-totals">
+      <div class="usage-total"><strong id="dsTokens">--</strong><span>DeepSeek tokens</span><small id="dsCost">--</small></div>
+      <div class="usage-total codex"><strong id="codexTokens">--</strong><span>Codex tokens</span><small id="codexCost">--</small></div>
+      <div class="usage-total workbuddy"><strong id="workbuddyTokens">--</strong><span>WorkBuddy tokens</span><small id="workbuddyCost">--</small></div>
     </div>
+    <div class="usage-chart" id="usageChart" role="group" aria-label="最近七天 DeepSeek 和 Codex 每日 token 用量堆叠条形图">
+      <div class="usage-grid" id="usageGrid" aria-hidden="true"></div>
+      <div class="usage-columns" id="usageColumns"></div>
+    </div>
+    <div class="usage-status" id="usageStatus" role="status"></div>
   </div>
 </div>
+<div class="usage-tooltip" id="usageTooltip" role="tooltip" hidden></div>
 
 <div class="row">
   <div class="card weather-card">
-    <div class="card-title"><span class="dot weather"></span> 上海天气</div>
+    <div class="card-title weather-title">
+      <span class="weather-title-label"><span class="dot weather"></span><span id="weatherTitle">上海天气</span></span>
+      <span class="weather-city-controls">
+        <select class="weather-city-select" id="weatherCitySelect" aria-label="切换天气城市"></select>
+        <button class="weather-icon-button" id="weatherCityMenuButton" type="button" title="管理城市" aria-label="管理天气城市" aria-expanded="false" aria-controls="weatherCityMenu">⋯</button>
+        <div class="weather-city-menu" id="weatherCityMenu" hidden>
+          <button class="weather-menu-action" id="addWeatherCityButton" type="button">添加城市</button>
+          <button class="weather-menu-action" id="removeWeatherCityButton" type="button">删除当前城市</button>
+        </div>
+      </span>
+    </div>
+    <div class="weather-city-adder" id="weatherCityAdder" hidden>
+      <input class="weather-city-input" id="weatherCityInput" type="text" maxlength="40" autocomplete="off" placeholder="输入城市名称或拼音，如成都">
+      <button class="secondary-button" id="closeWeatherCityAdder" type="button">取消</button>
+      <div class="weather-search-results" id="weatherSearchResults" hidden></div>
+    </div>
     <div class="weather-layout">
       <div class="weather-block current">
         <div class="weather-kicker">目前</div>
-        <div class="weather-condition" id="weatherCurrentCondition">加载中...</div>
         <div class="weather-current" id="weatherCurrentTemp">--℃</div>
+        <div class="weather-condition" id="weatherCurrentCondition">加载中...</div>
       </div>
       <div class="weather-block">
         <div class="weather-kicker">明天</div>
-        <div class="weather-condition" id="weatherTomorrowCondition">加载中...</div>
         <div class="weather-range"><span id="weatherHigh">--</span>° / <span id="weatherLow">--</span>°</div>
+        <div class="weather-condition" id="weatherTomorrowCondition">加载中...</div>
       </div>
     </div>
     <div class="weather-source" id="weatherUpdated">中央气象台</div>
+    <div class="weather-error" id="weatherError"></div>
   </div>
 </div>
+
 </main>
 
 <section id="todoMode" hidden>
-<div class="todo-toolbar">
-  <button class="collapse-button" id="collapseTodosButton" type="button">折叠所有待办</button>
+<div class="markdown-toolbar">
+  <div class="markdown-file" id="markdownFilename">尚未选择 Markdown 文件</div>
+  <button class="secondary-button" id="chooseMarkdownButton" type="button">选择文件</button>
 </div>
-
-<div class="row" id="todoRow">
-  <div class="card todo-card">
-    <div class="card-title"><span class="dot todo"></span> 所有待办 · <span class="tag all" id="allCount">--</span></div>
-    <div class="todo-list" id="allTodos">加载中...</div>
-  </div>
-
-  <div class="card todo-card">
-    <div class="card-title">今日待办</div>
-    <div class="todo-filename" id="todayFilename"></div>
-    <div class="todo-list" id="todayTodos">加载中...</div>
+<div class="markdown-error" id="markdownError"></div>
+<div class="card markdown-card">
+  <article class="markdown-document" id="markdownDocument">
+    <div class="markdown-empty">正在读取 Markdown…</div>
+  </article>
+</div>
+<div class="card" id="articlesCard">
+  <div class="card-title">每日阅读 <button class="secondary-button" id="reloadArticlesButton" type="button" style="margin-left:auto" title="重新扫描目录并更换推送文章">刷新推送</button></div>
+  <div class="article-hint" id="articleTaskStatus" role="status">正在读取今日阅读进度…</div>
+  <div class="setting-error" id="articlesError" role="status"></div>
+  <div id="articlesList"></div>
+  <div class="article-reader" id="articleReader" hidden>
+    <div class="markdown-toolbar"><span class="article-hint" id="articleReadProgress" role="status"></span><button class="secondary-button" id="closeArticleButton" type="button">关闭文章</button></div>
+    <article class="markdown-document" id="articleContent"></article>
   </div>
 </div>
+</section>
+
+<section id="activityMode" hidden>
+  <div class="activity-toolbar">
+    <div class="activity-date-controls">
+      <button class="secondary-button" id="activityPrevious" type="button" aria-label="前一天">‹</button>
+      <input class="activity-date" id="activityDate" type="date" aria-label="电脑使用日期">
+      <button class="secondary-button" id="activityNext" type="button" aria-label="后一天">›</button>
+    </div>
+    <button class="secondary-button" id="activityRefresh" type="button">刷新</button>
+  </div>
+  <div class="setting-error" id="activityError" role="status"></div>
+  <div id="activityContent" hidden>
+    <div class="activity-summary">
+      <div><strong class="activity-value" id="activityActive">--</strong><span class="activity-label">使用时长</span></div>
+      <div><strong class="activity-value" id="activityAway">--</strong><span class="activity-label">离开时长</span></div>
+      <div><strong class="activity-value" id="activityAppCount">--</strong><span class="activity-label">使用应用</span></div>
+    </div>
+    <div class="activity-section"><div class="activity-title">每日使用</div><div class="activity-chart" id="activityDays"></div></div>
+    <div class="activity-section"><div class="activity-title">当天分布</div><div class="activity-chart activity-hours" id="activityHours"></div></div>
+    <div class="activity-section"><div class="activity-title">应用使用</div><div id="activityApps"></div></div>
+  </div>
 </section>
 
 <section class="chat-mode" id="chatMode" hidden>
@@ -473,7 +766,10 @@
         <option value="local">QiQi Qwen27B · 本地</option>
         <option value="deepseek">DeepSeek V4 Flash · API</option>
       </select>
-      <div class="chat-status" id="chatStatus">尚未启动</div>
+      <div class="chat-status-actions">
+        <button class="secondary-button lmstudio-manual-button" id="manualLmStudioButton" type="button" hidden>启动本地模型</button>
+        <div class="chat-status" id="chatStatus">尚未启动</div>
+      </div>
     </div>
     <div class="chat-history-toolbar">
       <select class="chat-session-select" id="chatSessionSelect" aria-label="切换历史对话"></select>
@@ -493,6 +789,8 @@
 
 <script>
 const REFRESH_MS = 10 * 60 * 1000;
+const WEATHER_CITY_STORAGE_KEY = "personal_dashboard_weather_city_v1";
+const DEFAULT_WEATHER_STATION = "WwcJd";
 function fmtNum(n) {
   if (n == null || isNaN(n)) return "--";
   if (n >= 100000000) return (n / 100000000).toFixed(2) + "亿";
@@ -503,6 +801,240 @@ function fmtNum(n) {
 function fmtFullNum(n) {
   if (n == null || isNaN(n)) return "--";
   return Number(n).toLocaleString("en-US");
+}
+
+function activityToday() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+function activityDuration(seconds) {
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}小时${minutes % 60 ? ` ${minutes % 60}分` : ""}` : `${minutes}分`;
+}
+document.getElementById("activityDate").value = activityToday();
+document.getElementById("activityDate").max = activityToday();
+let activityRequest = 0;
+let activityController;
+function renderActivity(data) {
+  document.getElementById("activityContent").hidden = false;
+  document.getElementById("activityActive").textContent = activityDuration(data.activeSeconds);
+  document.getElementById("activityAway").textContent = activityDuration(data.awaySeconds);
+  document.getElementById("activityAppCount").textContent = data.apps.length;
+  function chart(id, entries, maximum, daily) {
+    const chart = document.getElementById(id); chart.replaceChildren();
+    entries.forEach((item, i) => {
+      const column = document.createElement(daily ? "button" : "div");
+      column.className = "activity-column" + (daily && item.date === data.date ? " selected" : "");
+      column.title = `${daily ? item.date : `${item.hour}:00`} · ${activityDuration(daily ? item.activeSeconds : item.seconds)}`;
+      if (daily) {
+        column.type = "button";
+        column.style.cssText = "border:0;background:none;padding:0;cursor:pointer";
+        column.addEventListener("click", () => { document.getElementById("activityDate").value = item.date; void loadActivity(); });
+      }
+      const bar = document.createElement("div"); bar.className = "activity-bar";
+      bar.style.height = `${Math.max(0, (daily ? item.activeSeconds : item.seconds) / maximum * 75)}%`;
+      const label = document.createElement("div"); label.className = "activity-tick";
+      label.textContent = daily ? `${Number(item.date.slice(5, 7))}/${Number(item.date.slice(8))}` : (i % 6 === 0 || i === 23 ? String(item.hour) : "");
+      column.append(bar, label); chart.append(column);
+    });
+  }
+  chart("activityDays", data.days, Math.max(1, ...data.days.map(day => day.activeSeconds)), true);
+  chart("activityHours", data.hours, 3600, false);
+  const apps = document.getElementById("activityApps"); apps.replaceChildren();
+  if (!data.apps.length) {
+    const empty = document.createElement("div"); empty.className = "activity-empty"; empty.textContent = "当天没有使用记录"; apps.append(empty);
+  }
+  data.apps.forEach(item => {
+    const row = document.createElement("div"); row.className = "activity-app-row";
+    const heading = document.createElement("div"); heading.className = "activity-app-heading";
+    const name = document.createElement("span"); name.className = "activity-app-name"; name.textContent = item.app.replace(/\.exe$/i, ""); name.title = item.app;
+    const duration = document.createElement("span"); duration.className = "activity-app-duration"; duration.textContent = activityDuration(item.seconds);
+    heading.append(name, duration);
+    const track = document.createElement("div"); track.className = "activity-app-track";
+    const fill = document.createElement("div"); fill.className = "activity-app-fill"; fill.style.width = `${Math.min(100, item.seconds / Math.max(1, data.activeSeconds) * 100)}%`;
+    track.append(fill); row.append(heading, track); apps.append(row);
+  });
+}
+async function loadActivity(force = false) {
+  const dateInput = document.getElementById("activityDate");
+  const today = activityToday(); dateInput.max = today;
+  if (!dateInput.value || dateInput.value > today) dateInput.value = today;
+  document.getElementById("activityNext").disabled = dateInput.value >= today;
+  const request = ++activityRequest;
+  if (activityController) activityController.abort();
+  activityController = new AbortController();
+  const button = document.getElementById("activityRefresh"); button.disabled = true; button.textContent = "读取中…";
+  document.getElementById("activityContent").hidden = true;
+  const error = document.getElementById("activityError"); error.textContent = "";
+  try {
+    const response = await fetch(`/api/activity?date=${dateInput.value}${force ? "&refresh=1" : ""}`, { signal: activityController.signal });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "读取失败");
+    if (request === activityRequest) renderActivity(data);
+  } catch (failure) {
+    if (failure.name !== "AbortError" && request === activityRequest) error.textContent = failure.message || "无法读取电脑使用记录";
+  } finally {
+    if (request === activityRequest) { button.disabled = false; button.textContent = "刷新"; }
+  }
+}
+function moveActivityDay(offset) {
+  const input = document.getElementById("activityDate");
+  const date = new Date(`${input.value}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + offset);
+  input.value = date.toISOString().slice(0, 10); void loadActivity();
+}
+document.getElementById("activityDate").addEventListener("change", () => void loadActivity());
+document.getElementById("activityPrevious").addEventListener("click", () => moveActivityDay(-1));
+document.getElementById("activityNext").addEventListener("click", () => moveActivityDay(1));
+document.getElementById("activityRefresh").addEventListener("click", () => void loadActivity(true));
+setInterval(() => {
+  if (!document.hidden && !document.getElementById("activityMode").hidden) void loadActivity();
+}, 60000);
+
+function usageMoney(value, currency) {
+  if (value == null) return "费用未知";
+  return new Intl.NumberFormat("zh-CN", { style: "currency", currency,
+    minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value);
+}
+
+function usageDateRange() {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai",
+    year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const midnight = Date.parse(`${today}T00:00:00+08:00`);
+  return Array.from({ length: 7 }, (_, i) => ({
+    date: new Date(midnight + (i - 6) * 86400000 + 8 * 3600000).toISOString().slice(0, 10),
+    deepseek: null, codex: null, workbuddy: null,
+  }));
+}
+
+function usageAxisLabel(value) {
+  if (value >= 1e9) return `${+(value / 1e9).toFixed(1)}B`;
+  if (value >= 1e6) return `${+(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `${+(value / 1e3).toFixed(1)}K`;
+  return String(value);
+}
+
+const usageProviders = ["deepseek", "codex", "workbuddy"];
+const usageNames = { deepseek: "DeepSeek", codex: "Codex", workbuddy: "WorkBuddy" };
+function usageCredit(value) {
+  return Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 4 }) + " 积分";
+}
+function showUsageTooltip(button, date, provider, day, source, append = false) {
+  const tooltip = document.getElementById("usageTooltip");
+  if (!append) tooltip.replaceChildren();
+  const title = document.createElement("div");
+  title.className = "usage-tooltip-title";
+  title.textContent = `${date} · ${usageNames[provider]}`;
+  tooltip.append(title);
+  const note = message => {
+    const el = document.createElement("div");
+    el.className = "usage-tooltip-note";
+    el.textContent = message;
+    tooltip.append(el);
+  };
+  if (!day) {
+    note("当日数据尚未采集");
+  } else {
+    const rows = [["总 tokens", fmtFullNum(day.tokens)], ["输入（未缓存）", fmtFullNum(day.inputTokens)],
+      ["缓存读取", fmtFullNum(day.cacheReadTokens)], ["输出", fmtFullNum(day.outputTokens)]];
+    if (day.cacheCreationTokens) rows.push(["缓存写入", fmtFullNum(day.cacheCreationTokens)]);
+    if (day.reasoningOutputTokens) rows.push(["其中推理（已含在输出）", fmtFullNum(day.reasoningOutputTokens)]);
+    const unpriced = day.unpricedModels?.length > 0;
+    rows.push(provider === "workbuddy" ? ["消耗积分", usageCredit(day.credit)] : ["费用",
+      unpriced && !day.cost ? "价格未知" : usageMoney(day.cost, source.currency)]);
+    for (const [label, value] of rows) {
+      const row = document.createElement("div");
+      row.className = "usage-tooltip-row";
+      const key = document.createElement("span"); key.textContent = label;
+      const text = document.createElement("strong"); text.textContent = value;
+      row.append(key, text); tooltip.append(row);
+    }
+    if (unpriced) note(`价格未知：${day.unpricedModels.join("、")}`);
+
+  }
+  if (source.error) note("更新失败");
+  tooltip.hidden = false;
+  button.setAttribute("aria-describedby", "usageTooltip");
+  const rect = button.getBoundingClientRect();
+  const box = tooltip.getBoundingClientRect();
+  tooltip.style.left = `${Math.max(8, Math.min(rect.left + rect.width / 2 - box.width / 2, innerWidth - box.width - 8))}px`;
+  const above = rect.top - box.height - 8;
+  tooltip.style.top = `${Math.max(8, Math.min(above >= 8 ? above : rect.bottom + 8, innerHeight - box.height - 8))}px`;
+}
+
+function hideUsageTooltip() {
+  document.getElementById("usageTooltip").hidden = true;
+  document.querySelectorAll('.usage-bar-target[aria-describedby]').forEach(button => button.removeAttribute("aria-describedby"));
+}
+document.addEventListener("scroll", hideUsageTooltip, true);
+window.addEventListener("resize", hideUsageTooltip);
+window.addEventListener("blur", hideUsageTooltip);
+document.addEventListener("keydown", event => { if (event.key === "Escape") hideUsageTooltip(); });
+
+let previousUsageRender;
+function renderModelUsage(usage) {
+  const days = usage?.days?.length === 7 ? usage.days : usageDateRange();
+  const sources = usage?.sources || {};
+  const signature = JSON.stringify({ days, sources });
+  if (signature === previousUsageRender) return;
+  previousUsageRender = signature;
+  hideUsageTooltip();
+  const messages = [];
+  for (const provider of usageProviders) {
+    const source = sources[provider] || { currency: provider === "deepseek" ? "CNY" : "USD" };
+    const available = days.map(day => day[provider]).filter(Boolean);
+    const prefix = provider === "deepseek" ? "ds" : provider;
+    const total = available.reduce((sum, day) => sum + day.tokens, 0);
+    document.getElementById(`${prefix}Tokens`).textContent = available.length ? fmtNum(total) : "--";
+    document.getElementById(`${prefix}Tokens`).title = available.length ? `${fmtFullNum(total)} tokens` : "尚未采集";
+    const cost = available.reduce((sum, day) => sum + (day.cost || 0), 0);
+    const incomplete = available.some(day => day.unpricedModels?.length || day.cost == null);
+    document.getElementById(`${prefix}Cost`).textContent = !available.length ? "等待每日数据" :
+      provider === "workbuddy" ? usageCredit(available.reduce((sum, day) => sum + day.credit, 0)) :
+      `${incomplete && !cost ? "价格未知" : usageMoney(cost, source.currency)}${incomplete && cost ? " + 未知费用" : ""}`;
+    const name = usageNames[provider];
+    if (source.error) messages.push(`${name} 更新失败，保留已有数据`);
+    else if (available.length < 7) messages.push(`${name} ${available.length ? "部分日期待更新" : "等待采集"}`);
+  }
+  document.getElementById("usageStatus").textContent = messages.join("；");
+  const max = Math.max(1, ...days.map(day => usageProviders.reduce((sum, provider) => sum + (day[provider]?.tokens || 0), 0)));
+  const magnitude = 10 ** Math.floor(Math.log10(max));
+  const axisMax = Math.ceil(max / magnitude / 2) * magnitude * 2;
+  const grid = document.getElementById("usageGrid"); grid.replaceChildren();
+  for (let i = 0; i <= 2; i++) {
+    const line = document.createElement("div"); line.className = "usage-gridline";
+    line.style.bottom = `${i * 50}%`;
+    const label = document.createElement("span"); label.textContent = usageAxisLabel(axisMax * i / 2);
+    line.append(label); grid.append(line);
+  }
+  const columns = document.getElementById("usageColumns"); columns.replaceChildren();
+  days.forEach((day, index) => {
+    const column = document.createElement("div"); column.className = "usage-day";
+    const bars = document.createElement("div"); bars.className = "usage-bars";
+    const button = document.createElement("button"); button.type = "button"; button.className = "usage-bar-target";
+    button.dataset.date = day.date;
+    button.setAttribute("aria-label", `${day.date}：` + usageProviders.map(provider =>
+      `${usageNames[provider]} ${day[provider] ? fmtFullNum(day[provider].tokens) + " tokens" : "尚未采集"}`).join("；"));
+    const showDay = () => {
+      usageProviders.forEach((provider, i) => showUsageTooltip(button, day.date, provider, day[provider],
+        sources[provider] || { currency: provider === "deepseek" ? "CNY" : "USD" }, i > 0));
+    };
+    button.addEventListener("mouseenter", showDay); button.addEventListener("mouseleave", hideUsageTooltip);
+    button.addEventListener("focus", showDay); button.addEventListener("blur", hideUsageTooltip);
+    button.addEventListener("click", showDay);
+    for (const provider of usageProviders) {
+      const record = day[provider];
+      const source = sources[provider] || { currency: provider === "deepseek" ? "CNY" : "USD" };
+      const bar = document.createElement("span"); bar.className = `usage-bar ${provider}${record ? "" : " missing"}`;
+      bar.dataset.provider = provider;
+      if (record) bar.style.height = `${record.tokens / axisMax * 100}%`;
+      button.append(bar);
+      const show = () => showUsageTooltip(button, day.date, provider, record, source);
+      bar.addEventListener("mouseenter", show);
+    }
+    bars.append(button);
+    const label = document.createElement("div"); label.className = `usage-date${index === 6 ? " today" : ""}`;
+    label.textContent = index === 6 ? "今天" : `${Number(day.date.slice(5, 7))}/${Number(day.date.slice(8, 10))}`;
+    column.append(bars, label); columns.append(column);
+  });
 }
 
 const CHAT_SYSTEM_MESSAGE = {
@@ -518,6 +1050,146 @@ let chatSessions = loadChatSessions();
 let activeChatId = localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY);
 let chatReady = false;
 let chatBusy = false;
+let dashboardSettings = {
+  launchAtLogin: false,
+  autoStartLmStudio: true,
+  markdownFile: "",
+};
+let settingsReadyPromise;
+let nextRefreshDeadline = null;
+let manualRefreshBusy = false;
+let latestDashboardData = null;
+let weatherCities = [];
+let selectedWeatherStation = localStorage.getItem(WEATHER_CITY_STORAGE_KEY) || DEFAULT_WEATHER_STATION;
+let weatherSearchTimer;
+let weatherSearchController;
+
+function syncRefreshButton(refreshing) {
+  const button = document.getElementById("refreshInformationButton");
+  if (!button) return;
+  button.disabled = Boolean(refreshing);
+  button.textContent = refreshing ? "更新中…" : "更新数据";
+}
+
+function setSettingsPanel(open) {
+  const panel = document.getElementById("settingsPanel");
+  const button = document.getElementById("settingsButton");
+  panel.hidden = !open;
+  button.classList.toggle("active", open);
+  button.setAttribute("aria-expanded", String(open));
+}
+
+function syncSettingsControls() {
+  document.getElementById("articleBatchCountSetting").value = dashboardSettings.articleBatchCount || 4;
+  document.getElementById("dailyArticleGoalSetting").value = dashboardSettings.dailyArticleGoal || 4;
+  document.getElementById("articleReadSecondsSetting").value = dashboardSettings.articleReadSeconds || 30;
+  document.getElementById("articleDirectoryLabel").textContent = dashboardSettings.articleDirectory || "";
+  document.getElementById("launchAtLoginSetting").checked = Boolean(dashboardSettings.launchAtLogin);
+  document.getElementById("autoStartLmStudioSetting").checked = dashboardSettings.autoStartLmStudio !== false;
+  updateManualLmStudioButton();
+}
+
+async function initializeDashboardSettings() {
+  if (!window.dashboardApp) {
+    document.getElementById("settingsError").textContent = "设置仅在桌面悬浮窗中可用";
+    document.getElementById("markdownDocument").innerHTML =
+      '<div class="markdown-empty">请从桌面悬浮窗打开以选择 Markdown 文件</div>';
+    return dashboardSettings;
+  }
+  try {
+    dashboardSettings = await window.dashboardApp.getSettings();
+    syncSettingsControls();
+    await loadArticles();
+    await loadMarkdownDocument(dashboardSettings.markdownFile);
+  } catch (error) {
+    document.getElementById("settingsError").textContent = error?.message || "读取设置失败";
+  }
+  return dashboardSettings;
+}
+
+function ensureDashboardSettings() {
+  if (!settingsReadyPromise) settingsReadyPromise = initializeDashboardSettings();
+  return settingsReadyPromise;
+}
+
+async function updateSetting(patch) {
+  const errorElement = document.getElementById("settingsError");
+  errorElement.textContent = "";
+  try {
+    dashboardSettings = await window.dashboardApp.updateSettings(patch);
+    syncSettingsControls();
+    return true;
+  } catch (error) {
+    errorElement.textContent = error?.message || "保存设置失败";
+    syncSettingsControls();
+    return false;
+  }
+}
+
+async function loadMarkdownDocument(filePath) {
+  const documentElement = document.getElementById("markdownDocument");
+  const filenameElement = document.getElementById("markdownFilename");
+  if (!window.dashboardApp) return;
+  documentElement.innerHTML = '<div class="markdown-empty">正在读取 Markdown…</div>';
+  try {
+    const result = await window.dashboardApp.readMarkdown(filePath);
+    dashboardSettings.markdownFile = result.path;
+    filenameElement.textContent = result.filename;
+    filenameElement.title = result.path;
+    documentElement.innerHTML = result.html || '<div class="markdown-empty">文件内容为空</div>';
+  } catch (error) {
+    filenameElement.textContent = filePath || "Markdown 文件不可用";
+    documentElement.innerHTML = '<div class="markdown-empty"></div>';
+    documentElement.firstElementChild.textContent = error?.message || "Markdown 读取失败";
+  }
+}
+
+async function chooseMarkdownDocument() {
+  if (!window.dashboardApp) return;
+  try {
+    const result = await window.dashboardApp.chooseMarkdown();
+    if (result?.canceled) return;
+    dashboardSettings.markdownFile = result.path;
+    const filenameElement = document.getElementById("markdownFilename");
+    filenameElement.textContent = result.filename;
+    filenameElement.title = result.path;
+    document.getElementById("markdownDocument").innerHTML =
+      result.html || '<div class="markdown-empty">文件内容为空</div>';
+  } catch (error) {
+    document.getElementById("markdownDocument").innerHTML = '<div class="markdown-empty"></div>';
+    document.getElementById("markdownDocument").firstElementChild.textContent =
+      error?.message || "选择文件失败";
+  }
+}
+
+async function toggleMarkdownTask(event) {
+  const checkbox = event.target.closest('input[type="checkbox"][data-task-index]');
+  if (!checkbox || !window.dashboardApp) return;
+  const checked = checkbox.checked;
+  const errorElement = document.getElementById("markdownError");
+  errorElement.textContent = "";
+  checkbox.disabled = true;
+  try {
+    const result = await window.dashboardApp.toggleMarkdownTask(
+      dashboardSettings.markdownFile,
+      Number(checkbox.dataset.taskIndex),
+      checked,
+    );
+    dashboardSettings.markdownFile = result.path;
+    document.getElementById("markdownDocument").innerHTML =
+      result.html || '<div class="markdown-empty">文件内容为空</div>';
+  } catch (error) {
+    checkbox.checked = !checked;
+    checkbox.disabled = false;
+    errorElement.textContent = error?.message || "待办状态保存失败";
+  }
+}
+
+function updateManualLmStudioButton() {
+  const button = document.getElementById("manualLmStudioButton");
+  if (!button) return;
+  button.hidden = selectedChatProvider !== "local" || dashboardSettings.autoStartLmStudio !== false || chatReady;
+}
 
 function createChatSession() {
   const now = Date.now();
@@ -713,8 +1385,12 @@ function addChatMessage(role, content, extraClass) {
   return item;
 }
 
-async function startChatMode() {
-  if (chatReady) return true;
+async function startChatMode(forceLocalStart = false) {
+  await ensureDashboardSettings();
+  if (chatReady) {
+    updateManualLmStudioButton();
+    return true;
+  }
   if (!window.lmStudio) {
     setChatStatus("请从桌面悬浮窗打开", "error");
     return false;
@@ -722,25 +1398,39 @@ async function startChatMode() {
   if (selectedChatProvider === "deepseek") {
     chatReady = true;
     setChatStatus("DeepSeek API 已就绪", "ready");
+    updateManualLmStudioButton();
     return true;
   }
+  if (dashboardSettings.autoStartLmStudio === false && !forceLocalStart) {
+    setChatStatus("等待手动启动");
+    updateManualLmStudioButton();
+    return false;
+  }
+  const manualButton = document.getElementById("manualLmStudioButton");
+  manualButton.hidden = true;
+  manualButton.disabled = true;
   setChatStatus("正在后台启动 LM Studio…");
   try {
     const result = await window.lmStudio.start();
     chatReady = Boolean(result?.ready);
     setChatStatus(chatReady ? "模型已就绪" : "模型未就绪", chatReady ? "ready" : "error");
+    updateManualLmStudioButton();
     return chatReady;
   } catch (error) {
     setChatStatus(error?.message || "启动失败", "error");
+    updateManualLmStudioButton();
     return false;
+  } finally {
+    manualButton.disabled = false;
   }
 }
 
 async function setAppMode(mode) {
-  const selectedMode = ["summary", "todo", "chat"].includes(mode) ? mode : "summary";
+  const selectedMode = ["summary", "todo", "activity", "chat"].includes(mode) ? mode : "summary";
   const modes = {
     summary: { panel: "summaryMode", button: "summaryModeButton" },
     todo: { panel: "todoMode", button: "todoModeButton" },
+    activity: { panel: "activityMode", button: "activityModeButton" },
     chat: { panel: "chatMode", button: "modeButton" },
   };
 
@@ -752,6 +1442,7 @@ async function setAppMode(mode) {
     button.setAttribute("aria-selected", String(active));
   });
 
+  if (selectedMode === "activity") void loadActivity();
   if (selectedMode === "chat") {
     await startChatMode();
     document.getElementById("chatInput").focus();
@@ -811,11 +1502,231 @@ async function sendChatMessage() {
   }
 }
 
+let articleItems = [];
+let readingArticle = null;
+let articleRequest = 0;
+let articleListRequest = 0;
+let articleDate = "";
+let articleRefreshBusy = false;
+let articleArchiveBusy = false;
+let lastArticleTick = performance.now();
+
+function renderArticles() {
+  const list = document.getElementById("articlesList");
+  list.replaceChildren();
+  for (const item of articleItems) {
+    const row = document.createElement("div");
+    row.className = "article-row" + (item.done ? " done" : "");
+    const check = document.createElement("span");
+    check.className = "article-check";
+    check.textContent = item.done ? "☑" : "☐";
+    check.setAttribute("aria-label", item.done ? "已读" : "未读");
+    const open = document.createElement("button");
+    open.className = "article-open";
+    const title = document.createElement("span");
+    title.className = "article-title";
+    title.textContent = item.title;
+    const folder = document.createElement("span");
+    folder.className = "article-folder";
+    folder.textContent = item.folder;
+    open.append(title, folder);
+    open.addEventListener("click", () => openArticle(item));
+    const star = document.createElement("button");
+    star.className = "article-star";
+    star.textContent = item.favorite ? "⭐" : "☆";
+    star.disabled = item.favorite;
+    star.title = item.favorite ? "已收藏" : "收藏：在文件名前加 ⭐";
+    star.setAttribute("aria-label", star.title);
+    star.addEventListener("click", async () => {
+      star.disabled = true;
+      try {
+        await window.dashboardApp.favoriteArticle(item.id);
+        item.favorite = true;
+        document.getElementById("articlesError").textContent = "";
+        renderArticles();
+      } catch (error) {
+        star.disabled = false;
+        document.getElementById("articlesError").textContent = error.message;
+      }
+    });
+    const archive = document.createElement("button");
+    archive.type = "button";
+    archive.className = "article-archive";
+    archive.title = "归档：移入已归档，不再推送";
+    archive.setAttribute("aria-label", archive.title);
+    archive.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v12h14V8M9 12h6"/></svg>';
+    archive.disabled = articleArchiveBusy;
+    archive.addEventListener("click", async () => {
+      if (articleArchiveBusy) return;
+      articleArchiveBusy = true;
+      document.querySelectorAll(".article-archive").forEach(button => { button.disabled = true; });
+      const currentReading = readingArticle?.id === item.id ? readingArticle : null;
+      if (currentReading) currentReading.archiving = true;
+      // Invalidate any in-flight open of this article before it can start a timer.
+      if (document.getElementById("articleReader").dataset.articleId === item.id) closeArticle();
+      try {
+        await window.dashboardApp.archiveArticle(item.id);
+        ++articleListRequest;
+        articleItems = articleItems.filter(article => article.id !== item.id);
+        document.getElementById("articlesError").textContent = "";
+        renderArticles();
+        await loadArticles();
+      } catch (error) {
+        document.getElementById("articlesError").textContent = error.message;
+      } finally {
+        articleArchiveBusy = false;
+        document.querySelectorAll(".article-archive").forEach(button => { button.disabled = false; });
+      }
+    });
+    row.append(check, open, star, archive);
+    list.append(row);
+  }
+}
+
+async function loadArticles(refresh = false) {
+  if (articleRefreshBusy) return;
+  const progress = document.getElementById("articleTaskStatus");
+  if (!window.dashboardApp?.listArticles) {
+    progress.textContent = "请在桌面悬浮窗中使用每日阅读；更新后请重新启动应用。";
+    return;
+  }
+  const request = ++articleListRequest;
+  const button = document.getElementById("reloadArticlesButton");
+  if (refresh) {
+    articleRefreshBusy = true;
+    button.disabled = true;
+    button.textContent = "刷新中…";
+  }
+  try {
+    const result = await window.dashboardApp.listArticles({ refresh });
+    if (request !== articleListRequest) return;
+    articleItems = result.articles;
+    articleDate = result.date;
+    progress.textContent = `今日已完成 ${result.completedCount}/${result.dailyGoal} 篇`;
+    document.getElementById("articlesError").textContent = "";
+    renderArticles();
+  } catch (error) {
+    if (request !== articleListRequest) return;
+    // A temporarily unavailable sync directory must not erase the visible list.
+    document.getElementById("articlesError").textContent = "目录暂不可用，已保留当前列表；稍后会重试。" + error.message;
+  } finally {
+    if (refresh) {
+      articleRefreshBusy = false;
+      button.disabled = false;
+      button.textContent = "刷新推送";
+    }
+  }
+}
+
+function closeArticle() {
+  articleRequest++;
+  readingArticle = null;
+  document.getElementById("articleReader").hidden = true;
+  delete document.getElementById("articleReader").dataset.articleId;
+  document.getElementById("articleContent").replaceChildren();
+}
+
+async function openArticle(item) {
+  const request = ++articleRequest;
+  readingArticle = null;
+  const reader = document.getElementById("articleReader");
+  reader.hidden = false;
+  reader.dataset.articleId = item.id;
+  document.getElementById("articleContent").textContent = "正在读取…";
+  document.getElementById("articleReadProgress").textContent = "";
+  try {
+    const result = await window.dashboardApp.readArticle(item.id);
+    if (request !== articleRequest) return;
+    document.getElementById("articleContent").innerHTML = result.html;
+    document.getElementById("articleContent").scrollTop = 0;
+    readingArticle = { id: item.id, elapsed: 0, done: item.done, saving: false };
+    lastArticleTick = performance.now();
+    reader.scrollIntoView({ block: "nearest" });
+    document.getElementById("articlesError").textContent = "";
+  } catch (error) {
+    if (request !== articleRequest) return;
+    document.getElementById("articleContent").textContent = error.message;
+  }
+}
+
+setInterval(async () => {
+  const now = performance.now();
+  const elapsed = Math.min(1000, now - lastArticleTick);
+  lastArticleTick = now;
+  const reading = readingArticle;
+  if (!reading || reading.archiving) return;
+  const active = !document.hidden && document.hasFocus() && !document.getElementById("todoMode").hidden &&
+    document.getElementById("settingsPanel").hidden;
+  if (active && !reading.done && !reading.saving) reading.elapsed += elapsed;
+  const seconds = dashboardSettings.articleReadSeconds || 30;
+  document.getElementById("articleReadProgress").textContent = reading.done ? "✓ 已读 · 90 天内不再推荐" :
+    `${active ? "阅读中" : "计时暂停"} · ${Math.min(seconds, Math.floor(reading.elapsed / 1000))}/${seconds} 秒`;
+  if (reading.elapsed < seconds * 1000 || reading.done || reading.saving) return;
+  reading.saving = true;
+  try {
+    await window.dashboardApp.completeArticle(reading.id);
+    reading.done = true;
+    const item = articleItems.find(item => item.id === reading.id);
+    if (item) item.done = true;
+    renderArticles();
+    await loadArticles();
+  } catch (error) {
+    reading.elapsed = 0;
+    document.getElementById("articlesError").textContent = "保存阅读记录失败：" + error.message;
+  } finally { reading.saving = false; }
+}, 500);
+
+setInterval(() => { if (window.dashboardApp?.listArticles) void loadArticles(); }, 30000);
+window.addEventListener("focus", () => { if (window.dashboardApp?.listArticles) void loadArticles(); });
+
+for (const key of ["articleBatchCount", "dailyArticleGoal", "articleReadSeconds"]) {
+  document.getElementById(key + "Setting").addEventListener("change", async event => {
+    event.target.disabled = true;
+    if (await updateSetting({ [key]: Number(event.target.value) })) await loadArticles();
+    event.target.disabled = false;
+  });
+}
+document.getElementById("chooseArticleDirectoryButton").addEventListener("click", async () => {
+  try {
+    dashboardSettings = await window.dashboardApp.chooseArticleDirectory();
+    closeArticle();
+    syncSettingsControls();
+    await loadArticles();
+  } catch (error) { document.getElementById("settingsError").textContent = error.message; }
+});
+document.getElementById("reloadArticlesButton").addEventListener("click", () => loadArticles(true));
+document.getElementById("closeArticleButton").addEventListener("click", closeArticle);
+if (!window.dashboardApp) void loadArticles();
+
 initializeChatSessions();
+ensureDashboardSettings();
 setAppMode("summary");
 document.getElementById("summaryModeButton").addEventListener("click", () => setAppMode("summary"));
-document.getElementById("todoModeButton").addEventListener("click", () => setAppMode("todo"));
+document.getElementById("todoModeButton").addEventListener("click", async () => {
+  await setAppMode("todo");
+  await ensureDashboardSettings();
+  if (dashboardSettings.markdownFile) await loadMarkdownDocument(dashboardSettings.markdownFile);
+});
 document.getElementById("modeButton").addEventListener("click", () => setAppMode("chat"));
+document.getElementById("activityModeButton").addEventListener("click", () => setAppMode("activity"));
+document.getElementById("settingsButton").addEventListener("click", (event) => {
+  event.stopPropagation();
+  setSettingsPanel(document.getElementById("settingsPanel").hidden);
+});
+document.getElementById("settingsPanel").addEventListener("click", (event) => event.stopPropagation());
+document.addEventListener("click", () => setSettingsPanel(false));
+document.getElementById("launchAtLoginSetting").addEventListener("change", (event) =>
+  updateSetting({ launchAtLogin: event.target.checked }));
+document.getElementById("autoStartLmStudioSetting").addEventListener("change", async (event) => {
+  const saved = await updateSetting({ autoStartLmStudio: event.target.checked });
+  if (saved && event.target.checked && selectedChatProvider === "local" &&
+      !document.getElementById("chatMode").hidden && !chatReady) {
+    await startChatMode();
+  }
+});
+document.getElementById("chooseMarkdownButton").addEventListener("click", chooseMarkdownDocument);
+document.getElementById("markdownDocument").addEventListener("change", toggleMarkdownTask);
+document.getElementById("manualLmStudioButton").addEventListener("click", () => startChatMode(true));
 document.getElementById("newChatButton").addEventListener("click", startNewChatSession);
 document.getElementById("deleteChatButton").addEventListener("click", deleteActiveChatSession);
 document.getElementById("chatSessionSelect").addEventListener("change", switchChatSession);
@@ -831,27 +1742,226 @@ document.getElementById("chatInput").addEventListener("keydown", function(event)
   }
 });
 
+function selectedWeatherCity() {
+  return weatherCities.find((city) => city.stationId === selectedWeatherStation);
+}
+
+function syncWeatherCitySelector(cities) {
+  weatherCities = Array.isArray(cities) ? cities : [];
+  if (!weatherCities.some((city) => city.stationId === selectedWeatherStation)) {
+    selectedWeatherStation = weatherCities[0]?.stationId || DEFAULT_WEATHER_STATION;
+    localStorage.setItem(WEATHER_CITY_STORAGE_KEY, selectedWeatherStation);
+  }
+  const select = document.getElementById("weatherCitySelect");
+  const signature = weatherCities
+    .map((city) => `${city.stationId}:${city.name}:${city.province}`)
+    .join("|");
+  if (select.dataset.signature !== signature) {
+    select.replaceChildren();
+    weatherCities.forEach((city) => {
+      const option = document.createElement("option");
+      option.value = city.stationId;
+      option.textContent = city.name + (city.builtin ? "" : ` · ${city.province || ""}`);
+      select.appendChild(option);
+    });
+    select.dataset.signature = signature;
+  }
+  select.value = selectedWeatherStation;
+  const city = selectedWeatherCity();
+  document.getElementById("removeWeatherCityButton").disabled = !city || city.builtin;
+}
+
+function renderSelectedWeather(data) {
+  const city = selectedWeatherCity();
+  const weather = data?.weatherByCity?.[selectedWeatherStation] ||
+    (selectedWeatherStation === DEFAULT_WEATHER_STATION ? data?.weather : null);
+  document.getElementById("weatherTitle").textContent = `${city?.name || "城市"}天气`;
+  const errorElement = document.getElementById("weatherError");
+  const weatherError = data?.weatherErrors?.[selectedWeatherStation];
+  if (!weather?.current || !weather?.tomorrow) {
+    document.getElementById("weatherCurrentTemp").textContent = "--℃";
+    document.getElementById("weatherCurrentCondition").textContent = "暂无数据";
+    document.getElementById("weatherTomorrowCondition").textContent = "暂无数据";
+    document.getElementById("weatherHigh").textContent = "--";
+    document.getElementById("weatherLow").textContent = "--";
+    document.getElementById("weatherUpdated").textContent = "中央气象台";
+    errorElement.textContent = weatherError?.message || "等待天气数据更新";
+    return;
+  }
+  document.getElementById("weatherCurrentTemp").textContent = `${weather.current.temperature ?? "--"}℃`;
+  document.getElementById("weatherCurrentCondition").textContent = weather.current.condition || "--";
+  document.getElementById("weatherCurrentCondition").title = weather.current.condition || "";
+  document.getElementById("weatherTomorrowCondition").textContent = weather.tomorrow.condition || "--";
+  document.getElementById("weatherTomorrowCondition").title = weather.tomorrow.condition || "";
+  document.getElementById("weatherHigh").textContent = weather.tomorrow.high ?? "--";
+  document.getElementById("weatherLow").textContent = weather.tomorrow.low ?? "--";
+  const updateTime = weather.updatedAt ? weather.updatedAt.slice(11, 16) : "";
+  document.getElementById("weatherUpdated").textContent =
+    `中央气象台${updateTime ? ` · ${updateTime} 更新` : ""}`;
+  errorElement.textContent = weatherError ? "更新失败，当前显示上次有效数据" : "";
+}
+
+function setWeatherCityMenu(open) {
+  document.getElementById("weatherCityMenu").hidden = !open;
+  document.getElementById("weatherCityMenuButton").setAttribute("aria-expanded", String(open));
+}
+
+function setWeatherCityAdder(open) {
+  clearTimeout(weatherSearchTimer);
+  setWeatherCityMenu(false);
+  const adder = document.getElementById("weatherCityAdder");
+  adder.hidden = !open;
+  document.getElementById("weatherSearchResults").hidden = true;
+  document.getElementById("weatherError").textContent = "";
+  if (open) {
+    const input = document.getElementById("weatherCityInput");
+    input.value = "";
+    input.focus();
+  } else if (weatherSearchController) {
+    weatherSearchController.abort();
+  }
+}
+
+function renderWeatherSearchResults(results) {
+  const container = document.getElementById("weatherSearchResults");
+  container.replaceChildren();
+  container.hidden = false;
+  if (!results.length) {
+    const empty = document.createElement("div");
+    empty.className = "weather-search-empty";
+    empty.textContent = "没有找到匹配城市";
+    container.appendChild(empty);
+    return;
+  }
+  results.forEach((city) => {
+    const button = document.createElement("button");
+    button.className = "weather-search-result";
+    button.type = "button";
+    const name = document.createElement("span");
+    name.textContent = city.name;
+    const province = document.createElement("span");
+    province.textContent = city.province || "中央气象台站点";
+    button.append(name, province);
+    button.addEventListener("click", () => addWeatherCity(city));
+    container.appendChild(button);
+  });
+}
+
+async function searchWeatherCities(query) {
+  if (document.getElementById("weatherCityAdder").hidden) return;
+  const normalized = String(query || "").trim();
+  if (!normalized) {
+    document.getElementById("weatherSearchResults").hidden = true;
+    return;
+  }
+  if (weatherSearchController) weatherSearchController.abort();
+  weatherSearchController = new AbortController();
+  const container = document.getElementById("weatherSearchResults");
+  container.hidden = false;
+  container.innerHTML = '<div class="weather-search-empty">正在搜索…</div>';
+  try {
+    const response = await fetch(`/api/weather/search?q=${encodeURIComponent(normalized)}`, {
+      signal: weatherSearchController.signal,
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    if (!document.getElementById("weatherCityAdder").hidden) renderWeatherSearchResults(payload.results || []);
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    container.innerHTML = '<div class="weather-search-empty"></div>';
+    container.firstElementChild.textContent = error?.message || "城市搜索失败";
+  }
+}
+
+async function addWeatherCity(city) {
+  const errorElement = document.getElementById("weatherError");
+  errorElement.textContent = "正在添加并读取天气…";
+  try {
+    const response = await fetch("/api/weather/cities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(city),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    selectedWeatherStation = payload.city.stationId;
+    localStorage.setItem(WEATHER_CITY_STORAGE_KEY, selectedWeatherStation);
+    setWeatherCityAdder(false);
+    await fetchData();
+  } catch (error) {
+    errorElement.textContent = error?.message || "添加城市失败";
+  }
+}
+
+async function removeSelectedWeatherCity() {
+  const city = selectedWeatherCity();
+  if (!city || city.builtin) return;
+  if (!window.confirm(`从天气列表中删除“${city.name} · ${city.province}”？`)) return;
+  try {
+    const response = await fetch(
+      `/api/weather/cities?stationId=${encodeURIComponent(city.stationId)}`,
+      { method: "DELETE" },
+    );
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    selectedWeatherStation = DEFAULT_WEATHER_STATION;
+    localStorage.setItem(WEATHER_CITY_STORAGE_KEY, selectedWeatherStation);
+    await fetchData();
+  } catch (error) {
+    document.getElementById("weatherError").textContent = error?.message || "删除城市失败";
+  }
+}
+
+document.getElementById("weatherCitySelect").addEventListener("change", (event) => {
+  selectedWeatherStation = event.target.value;
+  localStorage.setItem(WEATHER_CITY_STORAGE_KEY, selectedWeatherStation);
+  renderSelectedWeather(latestDashboardData);
+  const city = selectedWeatherCity();
+  document.getElementById("removeWeatherCityButton").disabled = !city || city.builtin;
+});
+document.getElementById("weatherCityMenuButton").addEventListener("click", () =>
+  setWeatherCityMenu(document.getElementById("weatherCityMenu").hidden));
+
+document.addEventListener("click", event => {
+  if (!event.target.closest(".weather-city-controls")) setWeatherCityMenu(false);
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  if (!document.getElementById("weatherCityMenu").hidden || !document.getElementById("weatherCityAdder").hidden) {
+    setWeatherCityAdder(false);
+    document.getElementById("weatherCityMenuButton").focus();
+  }
+});
+
+document.getElementById("addWeatherCityButton").addEventListener("click", () =>
+  setWeatherCityAdder(document.getElementById("weatherCityAdder").hidden));
+document.getElementById("closeWeatherCityAdder").addEventListener("click", () => {
+  setWeatherCityAdder(false);
+  document.getElementById("weatherCityMenuButton").focus();
+});
+document.getElementById("removeWeatherCityButton").addEventListener("click", () => {
+  setWeatherCityMenu(false);
+  void removeSelectedWeatherCity();
+});
+document.getElementById("weatherCityInput").addEventListener("input", (event) => {
+  clearTimeout(weatherSearchTimer);
+  weatherSearchTimer = setTimeout(() => searchWeatherCities(event.target.value), 300);
+});
+
 async function fetchData() {
   try {
     const d = await (await fetch("/api/data")).json();
+    latestDashboardData = d;
     document.getElementById("zhihuReads").textContent = fmtNum(d.zhihu?.reads);
     document.getElementById("zhihuLikes").textContent = fmtNum(d.zhihu?.likes);
     document.getElementById("zhihuCollects").textContent = fmtNum(d.zhihu?.collects);
     document.getElementById("biliPlays").textContent = fmtNum(d.bilibili?.plays);
     document.getElementById("biliLikes").textContent = fmtNum(d.bilibili?.likes);
     document.getElementById("biliCollects").textContent = fmtNum(d.bilibili?.collects);
-    document.getElementById("dsTokens").textContent = fmtFullNum(d.deepseek?.tokens);
-    document.getElementById("dsCost").textContent = d.deepseek?.cost != null ? '¥' + d.deepseek.cost : "--";
-    const weather = d.weather;
-    if (weather?.current && weather?.tomorrow) {
-      document.getElementById("weatherCurrentTemp").textContent = weather.current.temperature + "℃";
-      document.getElementById("weatherCurrentCondition").textContent = weather.current.condition || "--";
-      document.getElementById("weatherTomorrowCondition").textContent = weather.tomorrow.condition || "--";
-      document.getElementById("weatherHigh").textContent = weather.tomorrow.high ?? "--";
-      document.getElementById("weatherLow").textContent = weather.tomorrow.low ?? "--";
-      const updateTime = weather.updatedAt ? weather.updatedAt.slice(11, 16) : "";
-      document.getElementById("weatherUpdated").textContent = "中央气象台" + (updateTime ? " · " + updateTime + " 更新" : "");
-    }
+    renderModelUsage(d.modelUsage);
+    syncWeatherCitySelector(d.weatherCities);
+    renderSelectedWeather(d);
     const s = document.getElementById("statusText");
     if (["starting", "refreshing"].includes(d.collectorStatus)) {
       s.className = "status starting";
@@ -863,122 +1973,57 @@ async function fetchData() {
       s.className = d.status === "ok" ? "status" : "status error";
       s.textContent = d.status === "ok" ? "● 数据就绪" : "● 暂无信息数据";
     }
+    nextRefreshDeadline = Number(d.nextRefreshAt) || null;
+    if (d.refreshInProgress) nextRefreshDeadline = null;
+    syncRefreshButton(d.refreshInProgress);
   } catch(e) {
     const s = document.getElementById("statusText");
     s.className = "status error";
     s.textContent = "● 信息服务不可用";
+    nextRefreshDeadline = null;
+    syncRefreshButton(false);
   }
-  countdown();
+  renderCountdown();
 }
 
-function countdown() {
-  let r = Math.floor(REFRESH_MS / 1000);
+function renderCountdown() {
   const el = document.getElementById("countdown");
-  el.textContent = "";
-  setInterval(() => {
-    r--; if (r <= 0) r = Math.floor(REFRESH_MS / 1000);
-    el.textContent = '下次更新 ' + Math.floor(r/60) + ':' + String(r%60).padStart(2,'0');
-  }, 1000);
-}
-
-async function fetchTodos() {
-  try {
-    const d = await (await fetch("/api/todos")).json();
-    renderAllTodos(d.all);
-    renderTodayTodos(d.today);
-  } catch(e) {
-    document.getElementById("allTodos").innerHTML = '<div class="todo-empty">加载失败</div>';
-    document.getElementById("todayTodos").innerHTML = '<div class="todo-empty">加载失败</div>';
-  }
-}
-
-function mdToHtml(t) {
-  return t
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g,"<em>$1</em>")
-    .replace(/`(.+?)`/g,"<code>$1</code>")
-    .replace(/\[(.+?)\]\((.+?)\)/g,'<a href="$2" target="_blank">$1</a>');
-}
-function renderAllTodos(data) {
-  var el = document.getElementById("allTodos");
-  if (!data || !data.items || data.items.length === 0) {
-    el.innerHTML = '<div class="todo-empty">暂无待办</div>';
-    document.getElementById("allCount").textContent = "0项";
+  if (!nextRefreshDeadline) {
+    el.textContent = document.getElementById("statusText").textContent.includes("更新中") ? "刷新进行中" : "";
     return;
   }
-  var total = data.items.length;
-  var doneCount = data.items.filter(function(i) { return i.done; }).length;
-  document.getElementById("allCount").textContent = doneCount + "/" + total;
-  var html = "", lastSection = "";
-  for (var i = 0; i < data.items.length; i++) {
-    var item = data.items[i];
-    if (item.section && item.section !== lastSection) {
-      html += '<div class="todo-section">' + item.section + '</div>';
-      lastSection = item.section;
-    }
-    html += '<div class="todo-item' + (item.done ? " done" : "") + '">' +
-      '<input type="checkbox" ' + (item.done ? "checked" : "") + ' data-type="all" data-index="' + i + '">' +
-      '<span class="todo-text">' + mdToHtml(item.text) + '</span></div>';
-  }
-  el.innerHTML = html;
+  const remaining = Math.max(0, Math.ceil((nextRefreshDeadline - Date.now()) / 1000));
+  const minutes = Math.floor(remaining / 60);
+  const seconds = String(remaining % 60).padStart(2, "0");
+  el.textContent = `下次更新 ${minutes}:${seconds}`;
 }
 
-function renderTodayTodos(data) {
-  var el = document.getElementById("todayTodos");
-  var fnEl = document.getElementById("todayFilename");
-  if (!data || !data.items || data.items.length === 0) {
-    fnEl.textContent = data && data.message ? data.message : "无当天待办";
-    el.innerHTML = "";
-    return;
-  }
-  fnEl.textContent = "📄 " + data.filename;
-  var html = "";
-  for (var i = 0; i < data.items.length; i++) {
-    var item = data.items[i];
-    html += '<div class="todo-item' + (item.done ? " done" : "") + '">' +
-      '<input type="checkbox" ' + (item.done ? "checked" : "") + ' data-type="today" data-index="' + i + '" data-filename="' + data.filename + '">' +
-      '<span class="todo-text">' + mdToHtml(item.text) + '</span></div>';
-  }
-  el.innerHTML = html;
-}
-
-async function toggleTodo(type, index, done, filename) {
+async function requestManualRefresh() {
+  if (manualRefreshBusy) return;
+  manualRefreshBusy = true;
+  syncRefreshButton(true);
+  nextRefreshDeadline = null;
+  const status = document.getElementById("statusText");
+  status.className = "status starting";
+  status.textContent = "● 信息更新中";
+  renderCountdown();
   try {
-    await fetch("/api/todos/toggle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: type, index: index, done: done, filename: filename })
-    });
-    fetchTodos();
-  } catch(e) { console.error(e); }
-}
-
-function setTodosCollapsed(collapsed) {
-  const row = document.getElementById("todoRow");
-  const button = document.getElementById("collapseTodosButton");
-  row.classList.toggle("todos-collapsed", collapsed);
-  button.textContent = collapsed ? "展开所有待办" : "折叠所有待办";
-  button.setAttribute("aria-expanded", String(!collapsed));
-  localStorage.setItem("todosCollapsed", collapsed ? "1" : "0");
-}
-
-document.getElementById("collapseTodosButton").addEventListener("click", function() {
-  setTodosCollapsed(!document.getElementById("todoRow").classList.contains("todos-collapsed"));
-});
-setTodosCollapsed(localStorage.getItem("todosCollapsed") === "1");
-
-document.addEventListener("change", function(e) {
-  if (e.target.tagName === "INPUT" && e.target.type === "checkbox" && e.target.dataset.type) {
-    toggleTodo(e.target.dataset.type, parseInt(e.target.dataset.index), e.target.checked, e.target.dataset.filename || null);
+    const response = await fetch("/api/refresh", { method: "POST" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await fetchData();
+  } catch (error) {
+    status.className = "status error";
+    status.textContent = "● 无法启动刷新";
+    syncRefreshButton(false);
+  } finally {
+    manualRefreshBusy = false;
   }
-});
+}
 
 fetchData();
-fetchTodos();
-setInterval(fetchData, REFRESH_MS);
-setInterval(fetchTodos, REFRESH_MS);
-document.addEventListener("dblclick", function(e) { if (e.target.tagName !== "INPUT") fetchData(); });
+setInterval(fetchData, 5000);
+setInterval(renderCountdown, 1000);
+document.getElementById("refreshInformationButton").addEventListener("click", requestManualRefresh);
 </script>
 </body>
 </html>

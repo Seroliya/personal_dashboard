@@ -2,3 +2,10 @@ desktop-panel/secrets.json
 node_modules/
 .browser-data/
 .auth.json
+data.json
+*.log
+backups/
+dist/
+.release-tools/
+desktop-panel/*-test.png
+desktop-panel/*-preview.png

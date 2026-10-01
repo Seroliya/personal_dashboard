@@ -1,21 +1,30 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, screen, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, screen, shell } = require("electron");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
+const os = require("os");
+const { NOTE_ROOT } = require("../runtime-paths");
 const { marked } = require("marked");
 const sanitizeHtml = require("sanitize-html");
+const { ArticleLibrary, DEFAULT_ROOT } = require("./articles");
+let articleLibrary;
+function articles() {
+  if (!articleLibrary) articleLibrary = new ArticleLibrary(path.join(app.getPath("userData"), "article-history.json"));
+  return articleLibrary;
+}
 
 const PROJECT_DIR = path.resolve(__dirname, "..");
 const DASHBOARD_URL = "http://127.0.0.1:3456";
 const LM_STUDIO_API = "http://127.0.0.1:1234";
-const LMS_EXE = "C:\\Users\\15300\\.lmstudio\\bin\\lms.exe";
+const LMS_EXE = process.env.LMS_EXE || path.join(os.homedir(), ".lmstudio", "bin", "lms.exe");
 const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 const DEEPSEEK_MODEL_ID = "deepseek-v4-flash";
-const SECRETS_FILE = path.join(__dirname, "secrets.json");
+const SECRETS_FILE = app.isPackaged ? path.join(app.getPath("userData"), "secrets.json") : path.join(__dirname, "secrets.json");
 const CHAT_MODEL_ID = "QiQi/qiqi-qwen27b-q3-no-thinking";
 const CHAT_MODEL_KEY = CHAT_MODEL_ID;
 const CHAT_MODEL_FALLBACK_KEY = "qiqi-qwen27b";
+const DEFAULT_MARKDOWN_FILE = path.join(NOTE_ROOT, "待办们！", "--全部待办任务清单.md");
 const HANDLE_SIZE = 56;
 const HANDLE_GAP = 12;
 const PANEL_MAX_WIDTH = 470;
@@ -32,23 +41,157 @@ let dragState;
 let lmStudioReadyPromise;
 let loadedChatModelId = CHAT_MODEL_KEY;
 
+function settingsFile() {
+  return path.join(app.getPath("userData"), "dashboard-settings.json");
+}
+
+function readStoredSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(settingsFile(), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredSettings(patch) {
+  const settings = { ...readStoredSettings(), ...patch };
+  fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
+  fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2), "utf8");
+  return settings;
+}
+
+function loginItemOptions(openAtLogin) {
+  const options = { openAtLogin };
+  if (!app.isPackaged) {
+    options.path = process.execPath;
+    options.args = [__dirname];
+  }
+  return options;
+}
+
+function getDashboardSettings() {
+  const stored = readStoredSettings();
+  const loginItem = app.getLoginItemSettings(loginItemOptions(Boolean(stored.launchAtLogin)));
+  return {
+    launchAtLogin: loginItem.openAtLogin,
+    autoStartLmStudio: stored.autoStartLmStudio !== false,
+    articleBatchCount: stored.articleBatchCount || stored.dailyArticleCount || 4,
+    dailyArticleGoal: stored.dailyArticleGoal || stored.dailyArticleCount || 4,
+    articleReadSeconds: stored.articleReadSeconds || 30,
+    articleDirectory: stored.articleDirectory || DEFAULT_ROOT,
+    markdownFile: typeof stored.markdownFile === "string" && stored.markdownFile
+      ? stored.markdownFile
+      : DEFAULT_MARKDOWN_FILE,
+  };
+}
+
+function updateDashboardSettings(patch) {
+  const allowed = {};
+  for (const [key, max, label] of [["articleBatchCount", 50, "一次推荐篇数"], ["dailyArticleGoal", 50, "每日目标篇数"], ["articleReadSeconds", 3600, "阅读秒数"]]) {
+    if (patch?.[key] !== undefined) {
+      if (!Number.isInteger(patch[key]) || patch[key] < 1 || patch[key] > max) {
+        throw new Error(`${label}须为 1–${max} 的整数`);
+      }
+      allowed[key] = patch[key];
+    }
+  }
+  if (typeof patch?.autoStartLmStudio === "boolean") {
+    allowed.autoStartLmStudio = patch.autoStartLmStudio;
+  }
+  if (typeof patch?.launchAtLogin === "boolean") {
+    app.setLoginItemSettings(loginItemOptions(patch.launchAtLogin));
+    allowed.launchAtLogin = patch.launchAtLogin;
+  }
+  writeStoredSettings(allowed);
+  return getDashboardSettings();
+}
+
+function validateMarkdownFile(filePath) {
+  const resolved = path.resolve(String(filePath || ""));
+  if (![".md", ".markdown"].includes(path.extname(resolved).toLowerCase())) {
+    throw new Error("请选择 Markdown（.md 或 .markdown）文件");
+  }
+  const stat = fs.statSync(resolved);
+  if (!stat.isFile()) throw new Error("选择的路径不是文件");
+  if (stat.size > 2 * 1024 * 1024) throw new Error("Markdown 文件不能超过 2 MB");
+  return resolved;
+}
+
+function readMarkdownDocument(filePath) {
+  const resolved = validateMarkdownFile(filePath || getDashboardSettings().markdownFile);
+  const content = fs.readFileSync(resolved, "utf8");
+  writeStoredSettings({ markdownFile: resolved });
+  return {
+    path: resolved,
+    filename: path.basename(resolved),
+    html: renderMarkdown(content, { interactiveTasks: true }),
+  };
+}
+
+function toggleMarkdownTask(request) {
+  const selectedFile = validateMarkdownFile(getDashboardSettings().markdownFile);
+  const requestedFile = path.resolve(String(request?.filePath || ""));
+  if (requestedFile !== selectedFile) {
+    throw new Error("只能修改当前选中的 Markdown 文件");
+  }
+  const taskIndex = Number(request?.taskIndex);
+  if (!Number.isInteger(taskIndex) || taskIndex < 0) {
+    throw new Error("任务序号无效");
+  }
+
+  const content = fs.readFileSync(selectedFile, "utf8");
+  const eol = content.includes("\r\n") ? "\r\n" : "\n";
+  const lines = content.split(/\r?\n/);
+  let currentTaskIndex = 0;
+  let updated = false;
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    if (!/^\s*[-+*]\s+\[[ xX]\]\s+/.test(lines[lineIndex])) continue;
+    if (currentTaskIndex === taskIndex) {
+      lines[lineIndex] = lines[lineIndex].replace(
+        /\[[ xX]\]/,
+        request?.checked ? "[x]" : "[ ]",
+      );
+      updated = true;
+      break;
+    }
+    currentTaskIndex += 1;
+  }
+  if (!updated) throw new Error("未找到对应的 Markdown 待办项");
+  fs.writeFileSync(selectedFile, lines.join(eol), "utf8");
+  return readMarkdownDocument(selectedFile);
+}
+
+async function chooseMarkdownDocument() {
+  const current = getDashboardSettings().markdownFile;
+  const result = await dialog.showOpenDialog(panelWindow, {
+    title: "选择要显示的 Markdown 文件",
+    defaultPath: fs.existsSync(current) ? current : path.dirname(DEFAULT_MARKDOWN_FILE),
+    properties: ["openFile"],
+    filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return { canceled: true };
+  return { canceled: false, ...readMarkdownDocument(result.filePaths[0]) };
+}
+
 marked.setOptions({
   gfm: true,
   breaks: true,
 });
 
-function renderMarkdown(content) {
+function renderMarkdown(content, options = {}) {
   const rendered = marked.parse(String(content || ""));
-  return sanitizeHtml(rendered, {
+  const sanitized = sanitizeHtml(rendered, {
     allowedTags: [
       ...sanitizeHtml.defaults.allowedTags,
       "img",
       "details",
       "summary",
+      "input",
     ],
     allowedAttributes: {
       ...sanitizeHtml.defaults.allowedAttributes,
       code: ["class"],
+      input: ["type", "checked", "disabled", "data-task-index"],
     },
     allowedSchemes: ["http", "https", "mailto"],
     transformTags: {
@@ -68,6 +211,14 @@ function renderMarkdown(content) {
         },
       }),
     },
+  });
+  if (!options.interactiveTasks) return sanitized;
+  let taskIndex = 0;
+  return sanitized.replace(/<input\b([^>]*\btype="checkbox"[^>]*)>/gi, (_match, attributes) => {
+    const checked = /\bchecked(?:="")?/.test(attributes);
+    const index = taskIndex;
+    taskIndex += 1;
+    return `<input type="checkbox" data-task-index="${index}"${checked ? " checked" : ""}>`;
   });
 }
 
@@ -303,11 +454,14 @@ function dashboardIsReady() {
 async function ensureDashboardServer() {
   if (await dashboardIsReady()) return true;
 
-  serverProcess = spawn("node.exe", [path.join(PROJECT_DIR, "server.js")], {
+  const nodeExecutable = app.isPackaged ? path.join(process.resourcesPath, "runtime", "node.exe") : "node.exe";
+  serverProcess = spawn(nodeExecutable, [path.join(PROJECT_DIR, "server.js")], {
     cwd: PROJECT_DIR,
     windowsHide: true,
     stdio: "ignore",
-    env: { ...process.env, SILENT: "true" },
+    env: { ...process.env, SILENT: "true", ...(app.isPackaged ? {
+      DASHBOARD_DATA_DIR: path.join(app.getPath("userData"), "server"),
+    } : {}) },
   });
   serverProcess.on("error", () => {
     serverProcess = undefined;
@@ -545,6 +699,52 @@ function registerIpc() {
   ipcMain.handle("chat-completion", async (_event, request) =>
     requestSelectedChatCompletion(request?.provider, request?.messages));
   ipcMain.handle("render-markdown", (_event, content) => renderMarkdown(content));
+  ipcMain.handle("dashboard-settings-get", () => getDashboardSettings());
+  ipcMain.handle("dashboard-settings-update", (_event, patch) =>
+    updateDashboardSettings(patch));
+  ipcMain.handle("markdown-document-read", (_event, filePath) =>
+    readMarkdownDocument(filePath));
+  ipcMain.handle("markdown-document-choose", () => chooseMarkdownDocument());
+  ipcMain.handle("markdown-task-toggle", (_event, request) => toggleMarkdownTask(request));
+  ipcMain.handle("articles-list", (_event, options) => articles().list(getDashboardSettings(), { refresh: options?.refresh === true }));
+  ipcMain.handle("articles-read", (_event, id) => {
+    const item = articles().read(id, getDashboardSettings());
+    const html = path.extname(item.file).toLowerCase() === ".txt"
+      ? `<pre>${sanitizeHtml(item.content, { allowedTags: [], allowedAttributes: {} })}</pre>`
+      : renderMarkdown(item.content);
+    // Inline local raster images because the dashboard is served over HTTP.
+    const withImages = sanitizeHtml(html, {
+      allowedTags: [...sanitizeHtml.defaults.allowedTags, "img", "details", "summary"],
+      allowedAttributes: { ...sanitizeHtml.defaults.allowedAttributes, img: ["src", "alt", "loading"] },
+      allowedSchemesByTag: { img: ["http", "https", "data"] },
+      transformTags: {
+        img: (_tag, attrs) => {
+          if (attrs.src && !/^[a-z][a-z\d+.-]*:|^\/\//i.test(attrs.src)) {
+            try {
+              const file = fs.realpathSync(path.resolve(path.dirname(item.file), decodeURIComponent(attrs.src)));
+              const relative = path.relative(articles().root, file);
+              const ext = path.extname(file).toLowerCase();
+              const mime = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp" }[ext];
+              if (!relative.startsWith("..") && !path.isAbsolute(relative) && mime && fs.statSync(file).size < 8 * 1024 * 1024) {
+                attrs.src = `data:${mime};base64,${fs.readFileSync(file).toString("base64")}`;
+              } else delete attrs.src;
+            } catch { delete attrs.src; }
+          }
+          return { tagName: "img", attribs: { ...attrs, loading: "lazy" } };
+        },
+        a: (_tag, attrs) => ({ tagName: "a", attribs: { ...attrs, target: "_blank", rel: "noopener noreferrer" } }),
+      },
+    });
+    return { id, title: item.title, html: withImages };
+  });
+  ipcMain.handle("articles-complete", (_event, id) => articles().complete(id, getDashboardSettings()));
+  ipcMain.handle("articles-favorite", (_event, id) => articles().favorite(id, getDashboardSettings()));
+  ipcMain.handle("articles-archive", (_event, id) => articles().archive(id, getDashboardSettings()));
+  ipcMain.handle("articles-directory", async () => {
+    const result = await dialog.showOpenDialog(panelWindow, { title: "选择文章目录", properties: ["openDirectory"] });
+    if (!result.canceled && result.filePaths[0]) writeStoredSettings({ articleDirectory: result.filePaths[0] });
+    return getDashboardSettings();
+  });
 }
 
 const gotLock = app.requestSingleInstanceLock();
