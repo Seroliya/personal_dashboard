@@ -3,7 +3,7 @@ const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { dataDirectory, browserOptions, NOTE_ROOT } = require("./runtime-paths");
+const { dataDirectory, browserOptions, NOTE_ROOT, waitForPlatformLogin, restoreBrowserState } = require("./runtime-paths");
 const { scrapeDeepseekUsage, collectCodexUsage, buildModelUsage } = require("./model-usage");
 const { createActivityCollector } = require("./activity-watch");
 const collectActivity = createActivityCollector();
@@ -39,6 +39,7 @@ let latestData = getSavedData();
 let collectorStatus = "starting";
 let collectorError = "";
 let browserContext;
+let collectorHeadless = false;
 let collectorInitialized = false;
 let refreshInProgress = false;
 let refreshPromise;
@@ -91,7 +92,7 @@ async function scrapeZhihu(page) {
   await page.waitForTimeout(3000);
   if (page.url().includes("signin") || page.url().includes("login")) {
     console.log("[知乎] 需要登录，请在浏览器中登录...");
-    await page.waitForURL("**/creator/**", { timeout: 120000 });
+    await waitForPlatformLogin(page, "知乎", "**/creator/**", collectorHeadless);
     await page.waitForTimeout(2000);
   }
   const data = await page.evaluate(async () => {
@@ -158,7 +159,7 @@ async function scrapeBilibili(page) {
   await page.waitForTimeout(3000);
   if (page.url().includes("passport") || page.url().includes("login")) {
     console.log("[B站] 需要登录，请在浏览器中登录...");
-    await page.waitForURL("**/data-center**", { timeout: 120000 });
+    await waitForPlatformLogin(page, "B站", "**/data-center**", collectorHeadless);
     await page.waitForTimeout(2000);
   }
   try {
@@ -205,7 +206,7 @@ async function scrapeBilibili(page) {
 }
 async function scrapeDeepseek(page) {
   console.log("[DeepSeek] 抓取近七天每日用量...");
-  const data = await scrapeDeepseekUsage(page);
+  const data = await scrapeDeepseekUsage(page, new Date(), { headless: collectorHeadless });
   console.log(`[DeepSeek] 近七天 Tokens:${data.tokens} 消费:${data.currency} ${data.cost.toFixed(4)}`);
   return data;
 }
@@ -398,9 +399,11 @@ function removeWeatherCity(stationId) {
 
 async function doScrape(context) {
   console.log("\n🔄 刷新数据...");
+  const failures = [];
   const page = await context.newPage();
   try {
     const zh = await scrapeZhihu(page).catch((e) => {
+      failures.push(e.message);
       console.error("[知乎]", e.message);
       return null;
     });
@@ -409,6 +412,7 @@ async function doScrape(context) {
         zhihu: { ...zh, updatedAt: new Date().toLocaleString("zh-CN") },
       });
     const bi = await scrapeBilibili(page).catch((e) => {
+      failures.push(e.message);
       console.error("[B站]", e.message);
       return null;
     });
@@ -417,6 +421,7 @@ async function doScrape(context) {
         bilibili: { ...bi, updatedAt: new Date().toLocaleString("zh-CN") },
       });
     const ds = await scrapeDeepseek(page).catch((e) => {
+      failures.push(e.message);
       console.error("[DeepSeek]", e.message);
       saveData({ deepseek: { ...latestData.deepseek, error: e.message } });
       return null;
@@ -429,6 +434,7 @@ async function doScrape(context) {
     saveData({});
     await context.storageState({ path: AUTH_FILE });
     console.log("✅ 刷新完成\n");
+    return failures;
   } finally {
     await page.close();
   }
@@ -620,19 +626,17 @@ async function initializeCollector() {
     ? JSON.parse(fs.readFileSync(AUTH_FILE, "utf-8"))
     : undefined;
   if (storageState) console.log("✅ 加载登录态");
-  const hideBrowser = IS_SILENT && Boolean(storageState);
+  collectorHeadless = IS_SILENT && Boolean(storageState?.cookies?.length ||
+    storageState?.origins?.some(origin => origin.localStorage?.length));
 
   try {
     browserContext = await chromium.launchPersistentContext(USER_DATA_DIR, {
-      headless: false,
-      args: hideBrowser
-        ? ["--window-position=-32000,-32000", "--window-size=1280,800"]
-        : [],
+      headless: collectorHeadless,
       ...browserOptions(),
       viewport: { width: 1280, height: 800 },
-      storageState,
     });
-    console.log(`浏览器已启动（${hideBrowser ? "后台窗口模式" : "可见模式"}）\n`);
+    await restoreBrowserState(browserContext, storageState);
+    console.log(`浏览器已启动（${collectorHeadless ? "无头模式" : "可见模式"}）\n`);
   } catch (error) {
     collectorStatus = "error";
     collectorError = error.message;
@@ -665,8 +669,9 @@ async function refreshInformation() {
     await Promise.all([refreshWeather(), refreshCodexUsage(), refreshWorkbuddyUsage()]);
     if (!collectorInitialized || !browserContext) return;
     try {
-      await doScrape(browserContext);
-      collectorStatus = "ready";
+      const failures = await doScrape(browserContext);
+      collectorStatus = failures.length ? "error" : "ready";
+      collectorError = failures.join("；");
     } catch (error) {
       collectorStatus = "error";
       collectorError = error.message;

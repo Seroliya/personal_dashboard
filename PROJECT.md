@@ -20,6 +20,8 @@
 
 发行包双击 `Personal Dashboard.exe` 或 `启动.cmd`，使用 `resources/runtime/node.exe` 启动后台服务。设置与文章历史在 `%APPDATA%/personal-dashboard-desktop`，采集缓存与登录态在其 `server` 子目录；源码模式维持项目目录，可用 `DASHBOARD_DATA_DIR` 覆盖。采集浏览器支持 `DASHBOARD_BROWSER_PATH`，兼容已有 Chromium 并回退到本机 Edge；没有登录态时首次窗口可见。固定个人路径改为当前用户目录；README.md 和包内使用说明描述全部接入条件。
 
+后台启动（`SILENT=true`）且登录态含 cookie 或 localStorage 时，浏览器使用真正的 `headless: true`，取消移到屏幕外的窗口方式。首次没有登录态、空登录态及手动运行 `npm start`/`登录平台.cmd` 时使用可见浏览器。Persistent context 启动后显式补回保存的会话 cookie 和缺失的按来源 localStorage，不覆盖 profile 中较新的值。无头模式遇到平台登录页立即报出重新登录提示，不等待不可见窗口中的人工操作；单项采集失败保留已有数据，汇总错误可悬停主状态查看。本调整在 v1.1.0 发布之后进行，旧发行包仍使用屏幕外窗口。
+
 ## 功能约定
 ### Markdown 与设置
 复用现有 `marked` 和 `sanitize-html` 渲染。日常待办保留独立的文件选择和复选框回写功能，文章预览不改变待办文件选择。桌面设置保存在 Electron `userData/dashboard-settings.json`；开机启动与模型自动启动维持原有设置。

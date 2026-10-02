@@ -18,4 +18,28 @@ function browserOptions(env = process.env, exists = fs.existsSync) {
 }
 
 const NOTE_ROOT = path.join(os.homedir(), "Nutstore", "1", "默认仓库");
-module.exports = { dataDirectory, browserOptions, NOTE_ROOT };
+
+async function waitForPlatformLogin(page, provider, pattern, headless = false) {
+  if (headless) throw new Error(`${provider} 登录已过期，请退出 Dashboard 后运行“登录平台.cmd”（源码运行 npm start）重新登录`);
+  await page.waitForURL(pattern, { timeout: 120000 });
+}
+
+async function restoreBrowserState(context, state) {
+  if (!state) return;
+  const existing = await context.cookies();
+  const key = cookie => JSON.stringify([cookie.name, cookie.domain, cookie.path]);
+  const keys = new Set(existing.map(key));
+  const missing = (state.cookies || []).filter(cookie => !keys.has(key(cookie)));
+  if (missing.length) await context.addCookies(missing);
+  if (state.origins?.length) {
+    await context.addInitScript(({ origins }) => {
+      const saved = origins.find(origin => origin.origin === location.origin);
+      if (!saved) return;
+      for (const { name, value } of saved.localStorage || []) {
+        if (localStorage.getItem(name) === null) localStorage.setItem(name, value);
+      }
+    }, { origins: state.origins });
+  }
+}
+
+module.exports = { dataDirectory, browserOptions, NOTE_ROOT, waitForPlatformLogin, restoreBrowserState };

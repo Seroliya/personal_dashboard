@@ -1963,6 +1963,7 @@ async function fetchData() {
     syncWeatherCitySelector(d.weatherCities);
     renderSelectedWeather(d);
     const s = document.getElementById("statusText");
+    s.title = d.collectorStatus === "error" ? d.collectorError || "" : "";
     if (["starting", "refreshing"].includes(d.collectorStatus)) {
       s.className = "status starting";
       s.textContent = d.collectorStatus === "refreshing" ? "● 信息更新中" : "● 信息服务启动中";

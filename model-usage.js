@@ -7,6 +7,7 @@ const { promisify } = require("node:util");
 const runFile = promisify(execFile);
 const TIMEZONE = "Asia/Shanghai";
 const DAY_MS = 86400000;
+const { waitForPlatformLogin } = require("./runtime-paths");
 
 function shanghaiDate(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -84,7 +85,7 @@ function parseDeepseekUsage(amountPayload, costPayload, now = new Date()) {
     cost: daily.reduce((sum, day) => sum + day.cost, 0), updatedAt: now.toISOString(), error: null };
 }
 
-async function scrapeDeepseekUsage(page, now = new Date()) {
+async function scrapeDeepseekUsage(page, now = new Date(), { headless = false } = {}) {
   const range = sevenDayRange(now);
   let headers;
   const capture = request => {
@@ -96,7 +97,7 @@ async function scrapeDeepseekUsage(page, now = new Date()) {
     await page.goto("https://platform.deepseek.com/usage", { waitUntil: "networkidle", timeout: 30000 });
     if (page.url().includes("sign_in") || page.url().includes("login")) {
       console.log("[DeepSeek] 需要登录，请在浏览器中登录...");
-      await page.waitForURL("**/usage**", { timeout: 120000 });
+      await waitForPlatformLogin(page, "DeepSeek", "**/usage**", headless);
       await page.waitForLoadState("networkidle");
     }
     if (!headers) throw new Error("DeepSeek 登录态不可用，未获得每日用量请求");
