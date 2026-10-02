@@ -35,6 +35,9 @@ let panelWindow;
 let tray;
 let serverProcess;
 let panelOpen = false;
+let panelTargetOpen = false;
+let floatingClosed = false;
+let trayMenuIcons;
 let animationToken = 0;
 let restingHandleBounds;
 let dragState;
@@ -502,8 +505,11 @@ function animatePanel(opening) {
   const targetX = opening ? geometry.openX : geometry.closedX;
   const startedAt = Date.now();
 
-  if (opening) {
+  if (opening && !panelOpen && !panelTargetOpen) {
     restingHandleBounds = handleWindow.getBounds();
+  }
+  panelTargetOpen = opening;
+  if (opening) {
     panelWindow.setBounds({
       x: geometry.closedX,
       y: geometry.y,
@@ -549,7 +555,30 @@ function animatePanel(opening) {
 
 function togglePanel() {
   if (!panelWindow || panelWindow.isDestroyed()) return;
-  animatePanel(!panelOpen);
+  if (floatingClosed) {
+    floatingClosed = false;
+    handleWindow.showInactive();
+    updateTrayMenu();
+    animatePanel(true);
+    return;
+  }
+  animatePanel(!panelTargetOpen);
+}
+
+function closeFloatingWindow() {
+  const restorePosition = panelOpen || panelTargetOpen;
+  ++animationToken;
+  panelOpen = false;
+  panelTargetOpen = false;
+  floatingClosed = true;
+  dragState = undefined;
+  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.hide();
+  if (handleWindow && !handleWindow.isDestroyed()) {
+    if (restorePosition && restingHandleBounds) handleWindow.setPosition(restingHandleBounds.x, restingHandleBounds.y);
+    handleWindow.webContents.send("panel-state", false);
+    handleWindow.hide();
+  }
+  updateTrayMenu();
 }
 
 function relaunchApplication() {
@@ -602,7 +631,7 @@ function createHandleWindow() {
   handleWindow.setAlwaysOnTop(true, "floating");
   handleWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   handleWindow.loadFile(path.join(__dirname, "handle.html"));
-  handleWindow.once("ready-to-show", () => handleWindow.showInactive());
+  handleWindow.once("ready-to-show", () => { if (!floatingClosed) handleWindow.showInactive(); });
   handleWindow.on("close", (event) => {
     if (!app.isQuitting) event.preventDefault();
   });
@@ -649,26 +678,30 @@ function createPanelWindow() {
   });
 }
 
-function createTray() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-      <rect x="2" y="2" width="28" height="28" rx="7" fill="#fff"/>
-      <path d="M9 11h14M9 16h14M9 21h14" stroke="#666" stroke-width="2.4" stroke-linecap="round"/>
-    </svg>`;
-  tray = new Tray(nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`));
-  tray.setToolTip("Personal Dashboard");
+function updateTrayMenu() {
+  if (!tray) return;
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "展开 / 收起", click: togglePanel },
-    { label: "重新加载面板", click: () => panelWindow.loadURL(DASHBOARD_URL) },
+    { label: floatingClosed ? "打开悬浮窗" : "展开 / 收起", icon: trayMenuIcons.toggle, click: togglePanel },
+    { label: "重新加载面板", icon: trayMenuIcons.reload, click: () => panelWindow.loadURL(DASHBOARD_URL) },
+    { label: "关闭悬浮窗", icon: trayMenuIcons.close, enabled: !floatingClosed, click: closeFloatingWindow },
     { type: "separator" },
     {
       label: "退出",
+      icon: trayMenuIcons.exit,
       click: () => {
         app.isQuitting = true;
         app.quit();
       },
     },
   ]));
+}
+
+function createTray() {
+  const image = name => nativeImage.createFromPath(path.join(__dirname, "icons", `${name}.png`));
+  trayMenuIcons = Object.fromEntries(["toggle", "reload", "close", "exit"].map(name => [name, image(name)]));
+  tray = new Tray(image("tray"));
+  tray.setToolTip("Personal Dashboard");
+  updateTrayMenu();
   tray.on("click", togglePanel);
 }
 

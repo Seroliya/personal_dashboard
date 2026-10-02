@@ -27,6 +27,7 @@ const files = ["dashboard.html", "server.js", "model-usage.js", "workbuddy-usage
   "runtime-paths.js", "ccusage.dashboard.json", "package.json", "package-lock.json", "README.md"];
 for (const file of files) fs.copyFileSync(path.join(root, file), path.join(app, file));
 fs.mkdirSync(path.join(app, "desktop-panel"));
+fs.cpSync(path.join(root, "desktop-panel", "icons"), path.join(app, "desktop-panel", "icons"), { recursive: true });
 for (const file of ["main.js", "panel-preload.js", "preload.js", "articles.js", "handle.html", "loading.html", "package.json"]) {
   fs.copyFileSync(path.join(root, "desktop-panel", file), path.join(app, "desktop-panel", file));
 }

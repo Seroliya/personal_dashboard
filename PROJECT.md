@@ -23,6 +23,10 @@
 后台启动（`SILENT=true`）且登录态含 cookie 或 localStorage 时，浏览器使用真正的 `headless: true`，取消移到屏幕外的窗口方式。首次没有登录态、空登录态及手动运行 `npm start`/`登录平台.cmd` 时使用可见浏览器。Persistent context 启动后显式补回保存的会话 cookie 和缺失的按来源 localStorage，不覆盖 profile 中较新的值。无头模式遇到平台登录页立即报出重新登录提示，不等待不可见窗口中的人工操作；单项采集失败保留已有数据，汇总错误可悬停主状态查看。本调整在 v1.1.0 发布之后进行，旧发行包仍使用屏幕外窗口。
 
 ## 功能约定
+### 悬浮窗与托盘
+- 托盘与菜单图标使用 `desktop-panel/icons` 的 PNG 和 @2x 资源，避免 Windows nativeImage 解码 SVG 为空；打包脚本显式包含资源目录。`scripts/generate-tray-icons.cjs` 可重新生成图标。
+- 托盘菜单包括展开/收起、重新加载面板、关闭悬浮窗和退出。关闭悬浮窗隐藏面板与按钮、取消未完成动画及拖动、恢复按钮原位置，后台与托盘继续运行；菜单随后显示“打开悬浮窗”，托盘单击也可恢复。退出才结束应用。动画目标状态独立记录，避免快速切换或关闭途中使窗口重新出现。
+
 ### Markdown 与设置
 复用现有 `marked` 和 `sanitize-html` 渲染。日常待办保留独立的文件选择和复选框回写功能，文章预览不改变待办文件选择。桌面设置保存在 Electron `userData/dashboard-settings.json`；开机启动与模型自动启动维持原有设置。
 
@@ -77,6 +81,7 @@
 修改前给出方案并备份相关文件，保留已有改动；长期约定发生变化时同步本文件。
 
 - 语法检查：`node --check desktop-panel/main.js` 和 `node --check desktop-panel/panel-preload.js`。
+- 托盘：`node --test desktop-panel/tray.test.js`，验证关闭/恢复、动画中关闭及快速切换，并在真实 Electron 中检查 PNG 解码和原生菜单图标。
 - 发布：`npm test`、`npm run test:ui`、`npm run package:windows`；源码与压缩包均不包含密钥、登录态、个人缓存、日志、测试截图或备份。Node.js 运行时许可证位于 `scripts/licenses/node-LICENSE.txt`；CI 固定 Node 22.17.1 与该许可证版本一致。
 - 模型用量：`node --test model-usage.test.js workbuddy-usage.test.js model-usage-ui.test.js`；UI 测试同样支持 `DASHBOARD_TEST_BROWSER`，覆盖跨月/换日、缓存和价格口径、WorkBuddy 登录与积分、缺失/失败状态、三色堆叠、悬停和键盘提示以及窄面板布局。
 - 电脑使用：`node --test activity-watch.test.js activity-watch-ui.test.js`，覆盖跨日和时段裁剪、重叠统计、缓存、AFK 查询、日期切换、刷新、错误与空态、360px 排版。
