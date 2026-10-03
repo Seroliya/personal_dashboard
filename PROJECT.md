@@ -57,7 +57,7 @@
 - DeepSeek 复用已登录的后台请求认证，读取 `/api/v0/usage/by_api_key/amount` 和 `cost` 的 GMT+8 每日分桶，汇总所有 API key 与模型；仅保存聚合结果，不持久化认证头或 API key 元数据。费用采用后台实际币种，不与 Codex 美元直接相加。
 - Codex 使用本地或全局安装的 `ccusage codex daily --json --config ccusage.dashboard.json --since YYYY-MM-DD --until YYYY-MM-DD --timezone Asia/Shanghai --no-offline`，每分钟独立刷新，手动更新也触发；更新价表失败时回退离线执行。不依赖浏览器采集成功，命令有超时且隐藏窗口，不在每次网页轮询时启动进程。
 - `ccusage.dashboard.json` 补充 GPT-6.1 Sol 官网价格（2026-10-02 核对 `https://developers.openai.com/api/docs/models/gpt-6.1-sol`）：每百万 token 标准输入 $2、缓存读取 $0.10、缓存写入 $2.50、输出 $10；超过 272K 输入的整次请求为 $4/$0.20/$5/$15，Priority 为 2 倍。配置字段 `Above200kTokens` 是 ccusage 的通用字段名，实际阈值由 ccusage 模型价表控制；不根据每日累计 token 选择长上下文档位。
-- Codex 费用采用 ccusage 计价，不代表订阅实际扣款；界面只展示数值和必要的“价格未知”，不添加估价解释。悬停或键盘聚焦柱子可查看精确 token、缓存、输出、推理和费用。
+- Codex 费用采用 ccusage 计价，不代表订阅实际扣款；界面只展示数值和必要的“价格未知”，不添加估价解释。悬停或键盘聚焦柱子可查看精确 token、缓存、输出、推理和费用。每日悬停总览跳过总 token 为 0 的供应商，三者均为 0 时不显示空浮层；数据缺失仍保留待采集提示。
 - WorkBuddy 读取 `http://127.0.0.1:8788/usage/analytics` 的 `realm=all&range=custom&since=秒时间戳&until=秒时间戳`，每天独立读取 `summary.window`，不使用 `all_time`。网关上下界均包含，结束值减一微秒以避免午夜重复；输入总量已含缓存，未缓存输入为 prompt 减 cached，推理包含在 completion 中。`credit` 是积分，只显示积分，不换算为货币。
 - WorkBuddy 默认使用用户授权的本地 admin 密码，环境变量 `WORKBUDDY_PASSWORD` 可覆盖；通过 `/panel/login` 获得的 token 仅保留在采集器内存，统计使用 `X-Panel-Token`，失效后自动重新登录。每分钟独立刷新，手动更新也触发，单次请求有超时。
 - `data.json` 的 `deepseek.daily`、`codex.daily`、`workbuddy.daily` 缓存成功结果，采集失败保留已有明细并记录各自错误。`/api/data` 动态生成 `modelUsage` 七天视图，旧 30 天总量不推算每日数据；未采集日期与有效零用量分开显示。

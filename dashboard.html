@@ -1020,7 +1020,9 @@ function renderModelUsage(usage) {
     button.setAttribute("aria-label", `${day.date}：` + usageProviders.map(provider =>
       `${usageNames[provider]} ${day[provider] ? fmtFullNum(day[provider].tokens) + " tokens" : "尚未采集"}`).join("；"));
     const showDay = () => {
-      usageProviders.forEach((provider, i) => showUsageTooltip(button, day.date, provider, day[provider],
+      const visibleProviders = usageProviders.filter(provider => day[provider]?.tokens !== 0);
+      if (!visibleProviders.length) return hideUsageTooltip();
+      visibleProviders.forEach((provider, i) => showUsageTooltip(button, day.date, provider, day[provider],
         sources[provider] || { currency: provider === "deepseek" ? "CNY" : "USD" }, i > 0));
     };
     button.addEventListener("mouseenter", showDay); button.addEventListener("mouseleave", hideUsageTooltip);

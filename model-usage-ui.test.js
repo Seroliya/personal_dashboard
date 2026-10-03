@@ -61,17 +61,28 @@ test("seven-day stacked bars: hover, precise tokens/costs, keyboard, missing dat
   assert.match(await page.locator("#usageTooltip").innerText(), /推理（已含在输出）/);
   await page.keyboard.press("Escape");
   assert.equal(await page.locator("#usageTooltip").isVisible(), false);
-  await page.locator(".usage-bar-target").last().hover();
+  await page.locator(".usage-bar-target").last().focus();
   assert.match(await page.locator("#usageTooltip").innerText(), /价格未知/);
   assert.match(await page.locator("#usageTooltip").innerText(), /unknown-model/);
   assert.match(await page.locator("#codexCost").innerText(), /未知费用/);
-  assert.match(await page.locator("#usageTooltip").innerText(), /¥0\.00/);
+  assert.doesNotMatch(await page.locator("#usageTooltip").innerText(), /DeepSeek/);
+  assert.match(await page.locator("#usageTooltip").innerText(), /WorkBuddy/);
   assert.equal(await page.locator('[data-provider="deepseek"]').last().evaluate(el => el.getBoundingClientRect().height), 0);
   if (process.env.DASHBOARD_TEST_SCREENSHOT) {
     await page.evaluate(() => { document.activeElement.blur(); hideUsageTooltip(); });
     await page.mouse.move(0, 0);
     await page.locator("#modelUsageCard").screenshot({ path: process.env.DASHBOARD_TEST_SCREENSHOT });
   }
+  const zeroCodex = { ...codex, daily: codex.daily.map(day => ({ ...day, tokens: 0 })) };
+  const zeroWorkbuddy = { ...workbuddy, daily: workbuddy.daily.map(day => ({ ...day, tokens: 0 })) };
+  modelUsage = buildModelUsage({ deepseek, codex: zeroCodex, workbuddy: zeroWorkbuddy });
+  await page.evaluate(() => fetchData());
+  await page.locator(".usage-bar-target").first().focus();
+  assert.match(await page.locator("#usageTooltip").innerText(), /DeepSeek/);
+  assert.doesNotMatch(await page.locator("#usageTooltip").innerText(), /Codex|WorkBuddy/);
+  await page.locator(".usage-bar-target").last().focus();
+  assert.equal(await page.locator("#usageTooltip").isVisible(), false);
+  assert.equal(await page.locator(".usage-bar-target").last().getAttribute("aria-describedby"), null);
   modelUsage = buildModelUsage({ codex: { ...codex, error: "failed" } });
   await page.evaluate(() => fetchData());
   assert.match(await page.locator("#usageStatus").innerText(), /DeepSeek 等待采集/);
