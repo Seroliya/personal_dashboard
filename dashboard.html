@@ -576,7 +576,7 @@
   .activity-date-controls { display: flex; align-items: center; gap: 6px; }
   .activity-date { width: 128px; padding: 5px; border: 1px solid #eee; border-radius: 5px; background: #fff; font: inherit; font-size: 12px; color: #555; }
   .activity-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #eee; }
-  .activity-value { display: block; font-size: 21px; font-weight: 600; color: #4f46e5; }
+  .activity-value { display: block; font-size: clamp(16px, 4.4vw, 21px); white-space: nowrap; font-weight: 600; color: #4f46e5; }
   .activity-label { font-size: 11px; color: #999; }
   .activity-section { padding: 14px 0; border-bottom: 1px solid #eee; }
   .activity-title { color: #555; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
@@ -585,14 +585,43 @@
   .activity-bar { width: 65%; max-width: 30px; border-radius: 3px 3px 0 0; background: #938df0; min-height: 0; }
   .activity-column.selected .activity-bar { background: #4f46e5; }
   .activity-tick { height: 20px; padding-top: 5px; font-size: 9px; color: #999; white-space: nowrap; }
-  .activity-hours { gap: 3px; height: 80px; }
-  .activity-hours .activity-bar { width: 100%; background: #14a38b; }
+  .activity-timeline { display: flex; gap: 7px; }
+  .activity-axis { width: 26px; flex-shrink: 0; height: 146px; position: relative; color: #999; font-size: 9px; }
+  .activity-axis span { position: absolute; right: 0; transform: translateY(50%); }
+  .activity-timeline-plot { position: relative; flex: 1; min-width: 0; }
+  .activity-hour-grid { position: absolute; top: 0; bottom: 20px; left: 0; right: 0; pointer-events: none; }
+  .activity-hour-grid span { position: absolute; width: 100%; border-top: 1px solid #eee; }
+  .activity-hours { position: relative; gap: 3px; height: 166px; }
+  .activity-hour-stack { height: calc(100% - 20px); width: 100%; display: flex; flex-direction: column-reverse; }
+  .activity-hour-segment { width: 100%; border: 0; padding: 0; min-height: 0; flex-shrink: 0; cursor: pointer; }
+  .activity-hour-segment:focus-visible { outline: 2px solid #333; outline-offset: -2px; }
+  .activity-category-legend { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 8px; font-size: 10px; color: #777; }
+  .activity-category-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; flex-shrink: 0; }
+  .activity-category-row { display: flex; align-items: center; gap: 5px; padding: 5px 0; font-size: 12px; min-width: 0; }
+  .activity-category-row .activity-category-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .activity-category-time { flex-shrink: 0; font-variant-numeric: tabular-nums; color: #666; }
+  .activity-category-children { margin-left: 17px; border-left: 1px solid #eee; padding-left: 7px; }
+  summary.activity-category-row { list-style: none; cursor: pointer; }
+  summary.activity-category-row::-webkit-details-marker { display: none; }
+  .activity-category-toggle { width: 11px; flex-shrink: 0; font-size: 14px; color: #888; text-align: center; }
+  details > summary .activity-category-toggle::before { content: "+"; }
+  details[open] > summary .activity-category-toggle::before { content: "−"; }
+  .activity-category-leaf > .activity-category-toggle::before { content: "·"; }
+  .activity-percent-control { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: #777; font-size: 11px; }
+  .activity-sunburst { max-width: 360px; margin: 0 auto; }
+  .activity-sunburst svg { width: 100%; height: auto; display: block; }
+  .activity-sunburst-sector { stroke: #fff; stroke-width: .7; cursor: pointer; }
+  .activity-sunburst-sector:hover, .activity-sunburst-sector:focus-visible { opacity: .8; stroke: #333; stroke-width: 1.5; outline: none; }
+  .activity-sunburst text { pointer-events: none; }
+  .activity-category-tooltip { position: fixed; z-index: 1000; max-width: min(280px, calc(100vw - 16px)); padding: 8px 10px; background: #fff; color: #333; border: 1px solid #eee; border-radius: 7px; box-shadow: 0 5px 20px #0002; white-space: pre-line; overflow-wrap: anywhere; font-size: 11px; pointer-events: none; }
   .activity-app-row { margin: 10px 0; }
   .activity-app-heading { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; margin-bottom: 5px; }
   .activity-app-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .activity-app-duration { flex-shrink: 0; color: #888; font-variant-numeric: tabular-nums; }
   .activity-app-track { height: 4px; background: #f3f2fd; border-radius: 3px; }
   .activity-app-fill { height: 100%; background: #938df0; border-radius: 3px; }
+  .activity-minor-apps { margin-top: 12px; padding-top: 8px; border-top: 1px dashed #eee; }
+  .activity-minor-apps > summary { color: #777; font-size: 12px; cursor: pointer; padding: 3px 0; }
   .activity-empty { color: #999; font-size: 12px; padding: 12px 0; }
   #activityMode .setting-error:empty { display: none; }
 </style>
@@ -757,9 +786,26 @@
       <div><strong class="activity-value" id="activityAppCount">--</strong><span class="activity-label">使用应用</span></div>
     </div>
     <div class="activity-section"><div class="activity-title">每日使用</div><div class="activity-chart" id="activityDays"></div></div>
-    <div class="activity-section"><div class="activity-title">当天分布</div><div class="activity-chart activity-hours" id="activityHours"></div></div>
+    <div class="activity-section">
+      <div class="activity-title">分类时间线</div>
+      <div class="activity-timeline">
+        <div class="activity-axis" aria-hidden="true"><span style="bottom:100%">1h</span><span style="bottom:75%">45m</span><span style="bottom:50%">30m</span><span style="bottom:25%">15m</span><span style="bottom:0">0</span></div>
+        <div class="activity-timeline-plot">
+          <div class="activity-hour-grid" aria-hidden="true"><span style="bottom:100%"></span><span style="bottom:75%"></span><span style="bottom:50%"></span><span style="bottom:25%"></span><span style="bottom:0"></span></div>
+          <div class="activity-chart activity-hours" id="activityHours"></div>
+        </div>
+      </div>
+      <div class="activity-category-legend" id="activityCategoryLegend"></div>
+    </div>
+    <div class="activity-section">
+      <div class="activity-title">分类树</div>
+      <div id="activityCategoryTree"></div>
+      <label class="activity-percent-control"><input id="activityCategoryPercent" type="checkbox">显示百分比</label>
+    </div>
+    <div class="activity-section"><div class="activity-title">分类旭日图</div><div class="activity-sunburst" id="activitySunburst"></div></div>
     <div class="activity-section"><div class="activity-title">应用使用</div><div id="activityApps"></div></div>
   </div>
+  <div class="activity-category-tooltip" id="activityCategoryTooltip" role="tooltip" hidden></div>
 </section>
 
 <section class="chat-mode" id="chatMode" hidden>
@@ -820,7 +866,164 @@ document.getElementById("activityDate").value = activityToday();
 document.getElementById("activityDate").max = activityToday();
 let activityRequest = 0;
 let activityController;
+let latestActivityData;
+let activityMinorAppsExpanded = false;
+const activityExpandedCategories = new Set();
+function activityExactDuration(seconds) {
+  const value = Math.floor(Math.max(0, seconds));
+  const parts = [];
+  if (value >= 3600) parts.push(`${Math.floor(value / 3600)}小时`);
+  if (value >= 60 && Math.floor(value / 60) % 60) parts.push(`${Math.floor(value / 60) % 60}分`);
+  if (value % 60 || !parts.length) parts.push(`${value % 60}秒`);
+  return parts.join(" ");
+}
+function activityPercent(seconds, total) {
+  return `${(total > 0 ? seconds / total * 100 : 0).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%`;
+}
+function hideActivityCategoryTooltip() {
+  document.getElementById("activityCategoryTooltip").hidden = true;
+  document.querySelectorAll('[aria-describedby="activityCategoryTooltip"]').forEach(el => el.removeAttribute("aria-describedby"));
+}
+function bindActivityCategoryTooltip(element, text) {
+  element.setAttribute("aria-label", text);
+  const show = () => {
+    const tooltip = document.getElementById("activityCategoryTooltip");
+    tooltip.textContent = text; tooltip.hidden = false;
+    element.setAttribute("aria-describedby", "activityCategoryTooltip");
+    const rect = element.getBoundingClientRect(), box = tooltip.getBoundingClientRect();
+    tooltip.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - box.width - 8))}px`;
+    const above = rect.top - box.height - 8;
+    tooltip.style.top = `${Math.max(8, Math.min(above >= 8 ? above : rect.bottom + 8, innerHeight - box.height - 8))}px`;
+  };
+  element.addEventListener("mouseenter", show);
+  element.addEventListener("focus", () => {
+    // Focusing a chart below the fold scrolls it into view first.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (document.activeElement === element && !document.getElementById("activityMode").hidden) show();
+    }));
+  });
+  element.addEventListener("mouseleave", hideActivityCategoryTooltip);
+  element.addEventListener("blur", hideActivityCategoryTooltip);
+}
+document.addEventListener("scroll", hideActivityCategoryTooltip, true);
+window.addEventListener("resize", hideActivityCategoryTooltip);
+window.addEventListener("blur", hideActivityCategoryTooltip);
+document.addEventListener("keydown", event => { if (event.key === "Escape") hideActivityCategoryTooltip(); });
+
+function activityEmpty(container) {
+  const empty = document.createElement("div"); empty.className = "activity-empty";
+  empty.textContent = "当天没有使用记录"; container.append(empty);
+}
+function renderActivityTimeline(data) {
+  const chart = document.getElementById("activityHours"); chart.replaceChildren();
+  data.hours.forEach(item => {
+    const column = document.createElement("div"); column.className = "activity-column";
+    const stack = document.createElement("div"); stack.className = "activity-hour-stack";
+    const categories = item.categories || (item.seconds > 0 ? [{ path: ["Uncategorized"], color: "#ccc", seconds: item.seconds }] : []);
+    categories.forEach(category => {
+      if (category.seconds <= 0) return;
+      const segment = document.createElement("button"); segment.type = "button"; segment.className = "activity-hour-segment";
+      segment.style.height = `${category.seconds / 3600 * 100}%`; segment.style.backgroundColor = category.color;
+      segment.dataset.category = JSON.stringify(category.path);
+      bindActivityCategoryTooltip(segment, `${item.hour}:00–${item.hour + 1}:00\n${category.path.join(" › ")}\n${activityExactDuration(category.seconds)} · ${activityPercent(category.seconds, item.seconds)}`);
+      stack.append(segment);
+    });
+    const label = document.createElement("div"); label.className = "activity-tick";
+    label.textContent = item.hour % 3 === 0 || item.hour === 23 ? String(item.hour) : "";
+    column.append(stack, label); chart.append(column);
+  });
+  const legend = document.getElementById("activityCategoryLegend"); legend.replaceChildren();
+  (data.categoryTree || []).forEach(category => {
+    const entry = document.createElement("span");
+    const swatch = document.createElement("span"); swatch.className = "activity-category-swatch"; swatch.style.backgroundColor = category.color;
+    entry.append(swatch, document.createTextNode(category.name)); legend.append(entry);
+  });
+}
+function renderActivityCategoryTree(data) {
+  const tree = document.getElementById("activityCategoryTree"); tree.replaceChildren();
+  const percent = document.getElementById("activityCategoryPercent").checked;
+  function row(node, branch) {
+    const row = document.createElement(branch ? "summary" : "div");
+    row.className = "activity-category-row" + (branch ? "" : " activity-category-leaf");
+    const toggle = document.createElement("span"); toggle.className = "activity-category-toggle"; toggle.setAttribute("aria-hidden", "true");
+    const swatch = document.createElement("span"); swatch.className = "activity-category-swatch"; swatch.style.backgroundColor = node.color;
+    const name = document.createElement("span"); name.className = "activity-category-name"; name.textContent = node.name;
+    row.title = `${node.path.join(" › ")} · ${activityExactDuration(node.seconds)} · ${activityPercent(node.seconds, data.activeSeconds)}`;
+    const time = document.createElement("span"); time.className = "activity-category-time";
+    time.textContent = percent ? activityPercent(node.seconds, data.activeSeconds) : activityExactDuration(node.seconds);
+    row.append(toggle, swatch, name, time); return row;
+  }
+  function add(nodes, container) {
+    nodes.forEach(node => {
+      if (!node.children?.length) { container.append(row(node, false)); return; }
+      const details = document.createElement("details");
+      const key = JSON.stringify(node.path); details.dataset.category = key;
+      details.open = activityExpandedCategories.has(key);
+      details.addEventListener("toggle", () => {
+        if (details.open) activityExpandedCategories.add(key); else activityExpandedCategories.delete(key);
+      });
+      details.append(row(node, true));
+      const children = document.createElement("div"); children.className = "activity-category-children";
+      add(node.children, children);
+      if (node.directSeconds > 0) children.append(row({ ...node, name: "本级", seconds: node.directSeconds }, false));
+      details.append(children); container.append(details);
+    });
+  }
+  if (data.categoryTree?.length) add(data.categoryTree, tree); else activityEmpty(tree);
+}
+document.getElementById("activityCategoryPercent").addEventListener("change", () => {
+  if (latestActivityData) renderActivityCategoryTree(latestActivityData);
+});
+
+function renderActivitySunburst(data) {
+  const container = document.getElementById("activitySunburst"); container.replaceChildren();
+  const roots = data.categoryTree || [];
+  if (!roots.length || data.activeSeconds <= 0) { activityEmpty(container); return; }
+  const svgElement = (tag, attrs = {}) => {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value)); return el;
+  };
+  const svg = svgElement("svg", { viewBox: "0 0 360 360", role: "group", "aria-label": "按分类层级展示当天使用时长" });
+  const depthOf = nodes => Math.max(...nodes.map(node => 1 + (node.children?.length ? depthOf(node.children) : 0)));
+  const width = 98 / depthOf(roots), center = 180, hole = 54;
+  const point = (radius, angle) => [center + radius * Math.sin(angle), center - radius * Math.cos(angle)];
+  function sector(node, start, end, depth) {
+    const inner = hole + width * depth, outer = inner + width;
+    const angleEnd = Math.min(end, start + Math.PI * 2 - .000001);
+    const a = point(outer, start), b = point(outer, angleEnd), c = point(inner, angleEnd), d = point(inner, start);
+    const large = angleEnd - start > Math.PI ? 1 : 0;
+    const path = svgElement("path", { d: `M ${a} A ${outer} ${outer} 0 ${large} 1 ${b} L ${c} A ${inner} ${inner} 0 ${large} 0 ${d} Z`,
+      fill: node.color, class: "activity-sunburst-sector", tabindex: "0", role: "img", "data-category": JSON.stringify(node.path) });
+    bindActivityCategoryTooltip(path, `${node.path.join(" › ")}\n${activityExactDuration(node.seconds)} · ${activityPercent(node.seconds, data.activeSeconds)}`);
+    svg.append(path);
+    const middle = (start + angleEnd) / 2, radius = (inner + outer) / 2;
+    const space = (angleEnd - start) * radius;
+    if (space > 30 && width > 15) {
+      const [x, y] = point(radius, middle);
+      let rotate = middle * 180 / Math.PI;
+      if (rotate > 90 && rotate < 270) rotate += 180;
+      const label = svgElement("text", { x, y, "text-anchor": "middle", "dominant-baseline": "middle", "font-size": "10", fill: "#222", transform: `rotate(${rotate},${x},${y})` });
+      const maxChars = Math.max(2, Math.floor(Math.min(space - 10, width * 2.4) / 7));
+      label.textContent = node.name.length > maxChars ? node.name.slice(0, maxChars - 1) + "…" : node.name;
+      svg.append(label);
+    }
+    let cursor = start;
+    (node.children || []).forEach(child => {
+      const next = cursor + (end - start) * child.seconds / node.seconds;
+      sector(child, cursor, next, depth + 1); cursor = next;
+    });
+  }
+  const total = roots.reduce((sum, node) => sum + node.seconds, 0);
+  let cursor = 0;
+  roots.forEach(node => { const end = cursor + Math.PI * 2 * node.seconds / total; sector(node, cursor, end, 0); cursor = end; });
+  const caption = svgElement("text", { x: center, y: center - 9, "text-anchor": "middle", "font-size": "10", fill: "#999" });
+  caption.textContent = "使用时长";
+  const value = svgElement("text", { x: center, y: center + 12, "text-anchor": "middle", "font-size": "13", fill: "#333" });
+  value.textContent = activityDuration(data.activeSeconds); svg.append(caption, value); container.append(svg);
+}
 function renderActivity(data) {
+  latestActivityData = data;
+  hideActivityCategoryTooltip();
   document.getElementById("activityContent").hidden = false;
   document.getElementById("activityActive").textContent = activityDuration(data.activeSeconds);
   document.getElementById("activityAway").textContent = activityDuration(data.awaySeconds);
@@ -844,12 +1047,14 @@ function renderActivity(data) {
     });
   }
   chart("activityDays", data.days, Math.max(1, ...data.days.map(day => day.activeSeconds)), true);
-  chart("activityHours", data.hours, 3600, false);
+  renderActivityTimeline(data);
+  renderActivityCategoryTree(data);
+  renderActivitySunburst(data);
   const apps = document.getElementById("activityApps"); apps.replaceChildren();
   if (!data.apps.length) {
     const empty = document.createElement("div"); empty.className = "activity-empty"; empty.textContent = "当天没有使用记录"; apps.append(empty);
   }
-  data.apps.forEach(item => {
+  function appRow(item) {
     const row = document.createElement("div"); row.className = "activity-app-row";
     const heading = document.createElement("div"); heading.className = "activity-app-heading";
     const name = document.createElement("span"); name.className = "activity-app-name"; name.textContent = item.app.replace(/\.exe$/i, ""); name.title = item.app;
@@ -857,10 +1062,20 @@ function renderActivity(data) {
     heading.append(name, duration);
     const track = document.createElement("div"); track.className = "activity-app-track";
     const fill = document.createElement("div"); fill.className = "activity-app-fill"; fill.style.width = `${Math.min(100, item.seconds / Math.max(1, data.activeSeconds) * 100)}%`;
-    track.append(fill); row.append(heading, track); apps.append(row);
-  });
+    track.append(fill); row.append(heading, track); return row;
+  }
+  data.apps.filter(item => item.seconds >= 300).forEach(item => apps.append(appRow(item)));
+  const minorApps = data.apps.filter(item => item.seconds < 300);
+  if (minorApps.length) {
+    const group = document.createElement("details"); group.id = "activityMinorApps"; group.className = "activity-minor-apps";
+    group.open = activityMinorAppsExpanded;
+    group.addEventListener("toggle", () => { activityMinorAppsExpanded = group.open; });
+    const summary = document.createElement("summary"); summary.textContent = `5 分钟以下的应用（${minorApps.length}）`;
+    group.append(summary, ...minorApps.map(appRow)); apps.append(group);
+  }
 }
 async function loadActivity(force = false) {
+  hideActivityCategoryTooltip();
   const dateInput = document.getElementById("activityDate");
   const today = activityToday(); dateInput.max = today;
   if (!dateInput.value || dateInput.value > today) dateInput.value = today;
@@ -1434,6 +1649,7 @@ async function startChatMode(forceLocalStart = false) {
 }
 
 async function setAppMode(mode) {
+  hideActivityCategoryTooltip();
   const selectedMode = ["summary", "todo", "activity", "chat"].includes(mode) ? mode : "summary";
   const modes = {
     summary: { panel: "summaryMode", button: "summaryModeButton" },

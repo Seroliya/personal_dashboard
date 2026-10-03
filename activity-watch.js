@@ -31,7 +31,88 @@ function unionDuration(intervals) {
   return (total + end - start) / 1000;
 }
 
-function summarizeActivity(period, activeEvents, awayEvents, now = new Date()) {
+function categoryPath(value) {
+  return Array.isArray(value) && value.length && value.every(part => typeof part === "string" && part)
+    ? value : ["Uncategorized"];
+}
+
+function effectiveClasses(settings) {
+  if (!Array.isArray(settings.category_sets) || !Array.isArray(settings.active_set_ids)) {
+    return Array.isArray(settings.classes) ? settings.classes : [];
+  }
+  const merged = new Map();
+  for (const id of settings.active_set_ids) {
+    const set = settings.category_sets.find(set => set.id === id);
+    for (const category of set?.categories || []) {
+      const key = JSON.stringify(category.name);
+      if (!merged.has(key)) merged.set(key, category);
+    }
+  }
+  return [...merged.values()];
+}
+
+function categoryColor(path, classes) {
+  for (let depth = path.length; depth > 0; depth--) {
+    const configured = classes.find(item => JSON.stringify(item.name) === JSON.stringify(path.slice(0, depth)))?.data?.color;
+    if (typeof configured === "string" && /^#[a-f\d]{3}(?:[a-f\d]{3})?$/i.test(configured)) return configured;
+  }
+  if (path[0] === "Uncategorized") return "#ccc";
+  const palette = ["#4998dc", "#aea1ff", "#a4dd00", "#fda1ff", "#fcdc00", "#73d8ff", "#fe9200"];
+  const hash = [...path[0]].reduce((value, char) => (value * 31 + char.codePointAt(0)) >>> 0, 0);
+  return palette[hash % palette.length];
+}
+
+// Each moment belongs to one category. On overlapping watcher records, the
+// most recently started record wins until it ends, then the previous resumes.
+function exclusiveActivity(active) {
+  const sorted = active.toSorted((a, b) => a.start - b.start || a.end - b.end);
+  const edges = sorted.flatMap((item, index) => [{ time: item.start, index, start: true }, { time: item.end, index, start: false }])
+    .sort((a, b) => a.time - b.time);
+  const live = new Set(), spans = [];
+  let i = 0;
+  while (i < edges.length) {
+    const start = edges[i].time;
+    while (i < edges.length && edges[i].time === start) {
+      const edge = edges[i++];
+      if (edge.start) live.add(edge.index); else live.delete(edge.index);
+    }
+    if (i === edges.length || !live.size) continue;
+    let winner = -1;
+    for (const index of live) winner = Math.max(winner, index);
+    spans.push({ ...sorted[winner], start, end: edges[i].time });
+  }
+  return spans;
+}
+
+function summarizeCategories(active, classes) {
+  const totals = new Map();
+  for (const item of active) {
+    const key = JSON.stringify(item.category);
+    if (!totals.has(key)) totals.set(key, { path: item.category, color: categoryColor(item.category, classes), seconds: 0 });
+    totals.get(key).seconds += (item.end - item.start) / 1000;
+  }
+  const categories = [...totals.values()].sort((a, b) => b.seconds - a.seconds);
+  const root = { children: [] };
+  for (const category of categories) {
+    let parent = root;
+    category.path.forEach((name, depth) => {
+      let node = parent.children.find(node => node.name === name);
+      if (!node) {
+        const path = category.path.slice(0, depth + 1);
+        node = { name, path, color: categoryColor(path, classes), seconds: 0, directSeconds: 0, children: [] };
+        parent.children.push(node);
+      }
+      node.seconds += category.seconds;
+      if (depth === category.path.length - 1) node.directSeconds += category.seconds;
+      parent = node;
+    });
+  }
+  const sort = nodes => { nodes.sort((a, b) => b.seconds - a.seconds); nodes.forEach(node => sort(node.children)); };
+  sort(root.children);
+  return { categories, categoryTree: root.children };
+}
+
+function summarizeActivity(period, activeEvents, awayEvents, now = new Date(), classes = []) {
   if (!Array.isArray(activeEvents) || !Array.isArray(awayEvents)) throw new Error("使用记录格式无效");
   const intervals = events => events.flatMap(event => {
     const timestamp = Date.parse(event.timestamp);
@@ -39,9 +120,10 @@ function summarizeActivity(period, activeEvents, awayEvents, now = new Date()) {
     if (!Number.isFinite(timestamp) || !Number.isFinite(duration) || duration < 0) throw new Error("使用记录时间无效");
     const start = Math.max(timestamp, period.start);
     const end = Math.min(timestamp + duration * 1000, period.end, now.getTime());
-    return end > start ? [{ start, end, app: String(event.data?.app || "unknown") }] : [];
+    return end > start ? [{ start, end, app: String(event.data?.app || "unknown"), category: categoryPath(event.data?.$category) }] : [];
   });
   const active = intervals(activeEvents);
+  const exclusive = exclusiveActivity(active);
   const away = intervals(awayEvents);
   const byApp = new Map();
   for (const item of active) {
@@ -52,10 +134,16 @@ function summarizeActivity(period, activeEvents, awayEvents, now = new Date()) {
     .sort((a, b) => b.seconds - a.seconds);
   const hours = Array.from({ length: 24 }, (_, hour) => {
     const start = period.start + hour * 3600000;
-    return { hour, seconds: unionDuration(active.map(item => [Math.max(start, item.start), Math.min(start + 3600000, item.end)])) };
+    const hourly = exclusive.flatMap(item => {
+      const end = Math.min(start + 3600000, item.end), clippedStart = Math.max(start, item.start);
+      return end > clippedStart ? [{ ...item, start: clippedStart, end }] : [];
+    });
+    const { categories } = summarizeCategories(hourly, classes);
+    return { hour, seconds: categories.reduce((sum, category) => sum + category.seconds, 0), categories };
   });
   return { date: period.date, activeSeconds: unionDuration(active.map(item => [item.start, item.end])),
-    awaySeconds: unionDuration(away.map(item => [item.start, item.end])), apps, hours };
+    awaySeconds: unionDuration(away.map(item => [item.start, item.end])), apps, hours,
+    ...summarizeCategories(exclusive, classes) };
 }
 
 async function fetchJson(fetchImpl, url, options = {}) {
@@ -80,10 +168,14 @@ function createActivityCollector({ fetchImpl = fetch, now = () => new Date(), ho
       const window = windows.find(bucket => bucket.hostname?.toLowerCase() === hostname.toLowerCase()) || windows[0];
       const afk = buckets.find(bucket => bucket.type === "afkstatus" && bucket.hostname === window?.hostname);
       if (!window || !afk) throw new Error("未找到 ActivityWatch 的窗口或离开状态记录");
+      let classes;
+      try { classes = effectiveClasses(await fetchJson(fetchImpl, `${BASE}/settings`)); }
+      catch { throw new Error("无法读取 ActivityWatch 分类规则，请稍后刷新"); }
       const query = [
         `windows = query_bucket(${JSON.stringify(window.id)});`,
         `afk = query_bucket(${JSON.stringify(afk.id)});`,
         'active = filter_period_intersect(windows, filter_keyvals(afk, "status", ["not-afk"]));',
+        `active = categorize(active, ${JSON.stringify(classes.filter(category => category.rule?.type != null).map(category => [category.name, category.rule]))});`,
         'RETURN = [active, filter_keyvals(afk, "status", ["afk"])];',
       ];
       const results = await fetchJson(fetchImpl, `${BASE}/query/`, { method: "POST",
@@ -91,7 +183,7 @@ function createActivityCollector({ fetchImpl = fetch, now = () => new Date(), ho
       if (!Array.isArray(results) || results.length !== periods.length) throw new Error("ActivityWatch 每日记录不完整");
       const days = periods.map((period, i) => {
         if (!Array.isArray(results[i]) || results[i].length !== 2) throw new Error("ActivityWatch 每日记录格式无效");
-        return summarizeActivity(period, results[i][0], results[i][1], clock);
+        return summarizeActivity(period, results[i][0], results[i][1], clock, classes);
       });
       const data = { date, ...days[6], days: days.map(({ date, activeSeconds }) => ({ date, activeSeconds })) };
       cache.set(date, { time: clock.getTime(), data });
@@ -103,4 +195,4 @@ function createActivityCollector({ fetchImpl = fetch, now = () => new Date(), ho
   };
 }
 
-module.exports = { localDate, dayPeriods, summarizeActivity, createActivityCollector };
+module.exports = { localDate, dayPeriods, summarizeActivity, createActivityCollector, effectiveClasses };

@@ -65,6 +65,10 @@
 ### 电脑使用
 - 依赖本机运行的 ActivityWatch，读取 `http://127.0.0.1:5600/api/0`。选择同一主机的 currentwindow 与 afkstatus bucket，优先当前电脑；通过原生 query API 的字符串数组查询，使用 `filter_period_intersect` 排除 AFK 时段。
 - 页面可选择日期、前后切换、刷新及点击七天柱子，展示当天使用/离开时长、应用数量、最近七天使用时长、24 小时分布和应用排行。按北京时间切日，拒绝未来和无效日期，区间裁剪到当天与当前时刻，重叠记录按时间并集计时；只返回应用名与统计，不返回窗口标题。
+- 从 `/api/0/settings` 读取有效分类（支持旧 `classes` 和按 `active_set_ids` 优先级合并的分类集），交给 ActivityWatch 原生 `categorize` 对已排除 AFK 的窗口事件分类；不在 Dashboard 另写正则匹配器。返回 `categories`、`categoryTree` 及 `hours[].categories` 的聚合时长，配置颜色沿父级继承，未配置颜色稳定分配。
+- 小时时间线按分类堆叠，共用 0–1h 纵轴；分类树默认折叠，可逐层展开并切换为全天使用占比，刷新保留展开状态。分类旭日图使用本地 SVG，无外部图表服务，内外环对应分类层级，悬停/键盘聚焦查看完整路径、精确时长和全天占比。
+- 分类统计将重叠事件拆成互斥时段，最新开始的事件优先，结束后恢复仍有效的旧事件；分类、小时堆叠及树根总和均等于有效使用时长。父节点记录包含子分类的 `seconds` 以及仅本级的 `directSeconds`，分类树展开后用“本级”显示直接时长，旭日图保留对应空外环，避免重复计时。
+- 应用使用中不足 300 秒的应用放入默认折叠的“5 分钟以下的应用”分组；正好 300 秒及以上正常显示。折叠仅影响列表展示，不改变统计、应用数量和图表；用户展开后刷新/换日保留本次会话的选择。
 - 同一天请求合并，结果缓存 30 秒，强制刷新跳过缓存；查询超时 10 秒。页面仅在显示时每分钟更新；连接失败或记录缺失显示明确错误，零记录显示空态。
 
 ### 每日文章推荐
@@ -90,7 +94,7 @@
 - 托盘：`node --test desktop-panel/tray.test.js`，验证关闭/恢复、动画中关闭及快速切换，并在真实 Electron 中检查 PNG 解码和原生菜单图标。
 - 发布：`npm test`、`npm run test:ui`、`npm run package:windows`；源码与压缩包均不包含密钥、登录态、个人缓存、日志、测试截图或备份。Node.js 运行时许可证位于 `scripts/licenses/node-LICENSE.txt`；CI 固定 Node 22.17.1 与该许可证版本一致。
 - 模型用量：`node --test model-usage.test.js workbuddy-usage.test.js model-usage-ui.test.js`；UI 测试同样支持 `DASHBOARD_TEST_BROWSER`，覆盖跨月/换日、缓存和价格口径、WorkBuddy 登录与积分、缺失/失败状态、三色堆叠、悬停和键盘提示以及窄面板布局。
-- 电脑使用：`node --test activity-watch.test.js activity-watch-ui.test.js`，覆盖跨日和时段裁剪、重叠统计、缓存、AFK 查询、日期切换、刷新、错误与空态、360px 排版。
+- 电脑使用：`node --test activity-watch.test.js activity-watch-ui.test.js`，覆盖跨日和时段裁剪、重叠统计及分类时长守恒、父子直接时间、颜色继承、分类集优先级、缓存、原生 AFK/分类查询、日期切换、刷新、分类树展开和百分比、堆叠比例、旭日图/悬停、错误与空态、360px 排版。
 - Clash：`node --test clash-status.test.js clash-status-ui.test.js`，验证运行模式与系统代理、缓存和失败清理、强制刷新、真实 HTTP CONNECT 路由，以及状态行/悬停 IP/360px 长位置排版。
 - 推荐逻辑：`node --test desktop-panel/articles.test.js`，覆盖默认读完 4 篇才完成任务、跨批次累计、同篇去重计数、换日、刷新换批、目录更新和中断恢复、身份迁移，以及数量调整、收藏幂等、重启、90 天边界、同名保护和损坏记录。
 - 界面集成：`node --test desktop-panel/articles-ui.test.js`，使用临时文章与真实 IPC 处理函数，验证图片、暂停计时、自动完成、收藏、设置持久化与原有待办。
