@@ -210,7 +210,9 @@
   }
   .secondary-button:hover { color: #333; border-color: #ccc; background: #fafafa; }
   .secondary-button:disabled { opacity: .55; cursor: wait; }
-  .summary-toolbar { display: flex; justify-content: flex-end; margin: 0 0 2px; }
+  .summary-toolbar { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin: 0 0 2px; }
+  .clash-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted, #94a3b8); font-size: 11px; }
+  .summary-toolbar .secondary-button { flex-shrink: 0; }
   .summary-toolbar .secondary-button { padding: 3px 0 3px 8px; border: 0; background: transparent; font-size: 11px; }
   #summaryMode .usage-totals { margin: 8px 0 10px; }
   #summaryMode .usage-total strong { font-size: 17px; }
@@ -638,6 +640,7 @@
 
 <main id="summaryMode">
 <div class="summary-toolbar">
+  <span class="clash-status" id="clashStatus">Clash · 查询中</span>
   <button class="secondary-button" id="refreshInformationButton" type="button">更新数据</button>
 </div>
 <section class="platform-summary" aria-label="创作平台数据">
@@ -1949,6 +1952,27 @@ document.getElementById("weatherCityInput").addEventListener("input", (event) =>
   weatherSearchTimer = setTimeout(() => searchWeatherCities(event.target.value), 300);
 });
 
+let clashStatusBusy = false;
+function renderClashStatus(data) {
+  const el = document.getElementById("clashStatus");
+  const modes = { tun: "TUN", proxy: "普通代理", disabled: "未启用", unknown: "模式未知" };
+  const available = data?.status === "ok";
+  el.textContent = available
+    ? `Clash · ${modes[data.mode] || modes.unknown}${data.mode === "disabled" ? "" : ` · ${data.location || "位置未知"}`}`
+    : "Clash · 未连接";
+  el.title = [el.textContent, available && data.ip].filter(Boolean).join("\n");
+}
+async function fetchClashStatus(force = false) {
+  if (clashStatusBusy) return;
+  clashStatusBusy = true;
+  try {
+    const response = await fetch(`/api/clash${force ? "?refresh=1" : ""}`, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error("代理状态不可用");
+    renderClashStatus(await response.json());
+  } catch { renderClashStatus(null); }
+  finally { clashStatusBusy = false; }
+}
+
 async function fetchData() {
   try {
     const d = await (await fetch("/api/data")).json();
@@ -2001,6 +2025,7 @@ function renderCountdown() {
 
 async function requestManualRefresh() {
   if (manualRefreshBusy) return;
+  void fetchClashStatus(true);
   manualRefreshBusy = true;
   syncRefreshButton(true);
   nextRefreshDeadline = null;
@@ -2022,6 +2047,8 @@ async function requestManualRefresh() {
 }
 
 fetchData();
+fetchClashStatus();
+setInterval(fetchClashStatus, 15000);
 setInterval(fetchData, 5000);
 setInterval(renderCountdown, 1000);
 document.getElementById("refreshInformationButton").addEventListener("click", requestManualRefresh);

@@ -9,6 +9,8 @@ const { createActivityCollector } = require("./activity-watch");
 const collectActivity = createActivityCollector();
 const { createWorkbuddyCollector } = require("./workbuddy-usage");
 const collectWorkbuddyUsage = createWorkbuddyCollector();
+const { createClashCollector } = require("./clash-status");
+const collectClashStatus = createClashCollector();
 chromium.use(StealthPlugin());
 const PORT = 3456;
 const REFRESH_MS = 10 * 60 * 1000;
@@ -546,6 +548,10 @@ function startServer() {
             nextRefreshAt,
           }),
         );
+      } else if (requestUrl.pathname === "/api/clash" && req.method === "GET") {
+        const status = await collectClashStatus(requestUrl.searchParams.get("refresh") === "1");
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+        res.end(JSON.stringify(status));
       } else if (requestUrl.pathname === "/api/activity" && req.method === "GET") {
         try {
           const activity = await collectActivity(requestUrl.searchParams.get("date") || undefined,

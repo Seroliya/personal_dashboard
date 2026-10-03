@@ -9,6 +9,7 @@
 - `model-usage.js`：DeepSeek 每日用量采集、ccusage Codex 采集和七天数据归一化；相关统计与图表测试为 `model-usage.test.js`、`model-usage-ui.test.js`。
 - `workbuddy-usage.js`：本机 WorkBuddy 网关登录和每日统计采集。
 - `activity-watch.js`：本机 ActivityWatch 按日查询和应用、小时统计；`/api/activity` 为页面数据入口。
+- `clash-status.js`：Clash 运行模式与代理出口 IP 地理位置；独立 `/api/clash` 接口，不阻塞平台统计。
 - `desktop-panel/main.js`：Electron 窗口、托盘、设置、Markdown 渲染与待办修改、文章 IPC、本地模型和 DeepSeek 对话。
 - `desktop-panel/panel-preload.js`：隔离界面的 IPC 桥接。
 - `desktop-panel/articles.js`：文章扫描、抽样、阅读历史和收藏重命名。
@@ -34,6 +35,11 @@
 - 各模块使用紧凑分区和细分隔线，取消独立背景卡片；知乎和 B站各一行，阅读/播放、赞同/点赞、收藏的标签与数值横排。400px 以下平台名称另起一行，三个指标仍保持同一行。
 - 模型用量保留七天堆叠图和悬停明细，减少标题、合计和图表留白；不显示时区、日期统计口径、API 估价说明及采集时间等解释文案。
 - 天气当前和明日信息横排，长描述可悬停查看全文，空错误区域不占高度。
+
+### Clash 状态
+- 信息总结工具栏左侧一行显示模式与出口地区，悬停查看完整 IP；没有独立卡片。模式读取 Mihomo `/configs` 的 `tun.enable`，普通代理同时核对 Windows 当前用户系统代理是否启用且指向 Clash 端口；未开启显示“未启用”，接口不可用显示“未连接”，地理位置失败只显示“位置未知”。
+- 默认读取 `%APPDATA%/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml`；`CLASH_CONFIG_PATH` 可覆盖。优先命名管道，适配 Verge 生成配置与实际管道名称不同的版本（按配置哈希匹配唯一运行管道），否则使用 TCP 控制接口。认证密钥仅留在服务端内存，不向页面返回。
+- HTTPS 地理查询 `https://ipwho.is/` 显式经过本地 Clash HTTP/mixed 端口，不回退直连。运行状态缓存 15 秒、出口位置缓存 2 分钟，合并并发请求，“更新数据”强制刷新；关闭/失败时清除旧出口，网络请求有超时。只读，不修改 Clash 配置。打包包含新模块及 `yaml`、`https-proxy-agent` 生产依赖；v1.1.0 旧压缩包未包含此更新。
 
 ### 城市天气
 - 内置上海（`WwcJd`）和重庆（`UkfaS`），在天气卡片内切换；当前选择使用浏览器 `localStorage` 持久化。
@@ -85,6 +91,7 @@
 - 发布：`npm test`、`npm run test:ui`、`npm run package:windows`；源码与压缩包均不包含密钥、登录态、个人缓存、日志、测试截图或备份。Node.js 运行时许可证位于 `scripts/licenses/node-LICENSE.txt`；CI 固定 Node 22.17.1 与该许可证版本一致。
 - 模型用量：`node --test model-usage.test.js workbuddy-usage.test.js model-usage-ui.test.js`；UI 测试同样支持 `DASHBOARD_TEST_BROWSER`，覆盖跨月/换日、缓存和价格口径、WorkBuddy 登录与积分、缺失/失败状态、三色堆叠、悬停和键盘提示以及窄面板布局。
 - 电脑使用：`node --test activity-watch.test.js activity-watch-ui.test.js`，覆盖跨日和时段裁剪、重叠统计、缓存、AFK 查询、日期切换、刷新、错误与空态、360px 排版。
+- Clash：`node --test clash-status.test.js clash-status-ui.test.js`，验证运行模式与系统代理、缓存和失败清理、强制刷新、真实 HTTP CONNECT 路由，以及状态行/悬停 IP/360px 长位置排版。
 - 推荐逻辑：`node --test desktop-panel/articles.test.js`，覆盖默认读完 4 篇才完成任务、跨批次累计、同篇去重计数、换日、刷新换批、目录更新和中断恢复、身份迁移，以及数量调整、收藏幂等、重启、90 天边界、同名保护和损坏记录。
 - 界面集成：`node --test desktop-panel/articles-ui.test.js`，使用临时文章与真实 IPC 处理函数，验证图片、暂停计时、自动完成、收藏、设置持久化与原有待办。
 - 界面测试需要可用 Playwright Chromium，可用环境变量 `DASHBOARD_TEST_BROWSER` 指定浏览器程序。本机已有浏览器位于 `%LOCALAPPDATA%\ms-playwright\chromium-1124\chrome-win\chrome.exe`。
