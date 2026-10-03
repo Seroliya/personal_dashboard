@@ -210,8 +210,8 @@
   }
   .secondary-button:hover { color: #333; border-color: #ccc; background: #fafafa; }
   .secondary-button:disabled { opacity: .55; cursor: wait; }
-  .summary-toolbar { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin: 0 0 2px; }
-  .clash-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted, #94a3b8); font-size: 11px; }
+  .summary-toolbar { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin: 0 0 2px; }
+  .clash-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #000; font-size: 11px; }
   .summary-toolbar .secondary-button { flex-shrink: 0; }
   .summary-toolbar .secondary-button { padding: 3px 0 3px 8px; border: 0; background: transparent; font-size: 11px; }
   #summaryMode .usage-totals { margin: 8px 0 10px; }
@@ -551,6 +551,7 @@
   .chat-send:disabled { background: #aaa; cursor: wait; }
 
   .footer { margin-top: 20px; font-size: 11px; color: #bbb; }
+  .footer-credit { margin-top: 5px; }
 
   .article-row { display: flex; align-items: flex-start; gap: 9px; padding: 11px 0; border-bottom: 1px solid #eee; }
   .article-row:last-child { border-bottom: 0; }
@@ -640,7 +641,6 @@
 
 <main id="summaryMode">
 <div class="summary-toolbar">
-  <span class="clash-status" id="clashStatus">Clash · 查询中</span>
   <button class="secondary-button" id="refreshInformationButton" type="button">更新数据</button>
 </div>
 <section class="platform-summary" aria-label="创作平台数据">
@@ -787,7 +787,10 @@
   </div>
 </section>
 
-<div class="footer">Developed by kiro_kiya</div>
+<div class="footer">
+  <div class="clash-status" id="clashStatus">Clash · 查询中</div>
+  <div class="footer-credit">Developed by kiro_kiya</div>
+</div>
 </div>
 
 <script>

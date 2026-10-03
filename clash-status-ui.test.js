@@ -27,8 +27,9 @@ test("compact Clash line renders modes, IP tooltip, failures and long locations 
   await page.evaluate(() => fetchClashStatus(true));
   assert.match(await line.innerText(), /Clash · TUN/);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  const rect = await line.boundingBox(), button = await page.locator("#refreshInformationButton").boundingBox();
-  assert.ok(rect.x + rect.width <= button.x);
+  const rect = await line.boundingBox(), credit = await page.locator(".footer-credit").boundingBox();
+  assert.ok(rect.y + rect.height <= credit.y);
+  assert.equal(await line.evaluate(el => getComputedStyle(el).color), "rgb(0, 0, 0)");
   status = { status: "ok", mode: "proxy", ip: null, location: null };
   await page.evaluate(() => fetchClashStatus(true));
   assert.equal(await line.innerText(), "Clash · 普通代理 · 位置未知");
