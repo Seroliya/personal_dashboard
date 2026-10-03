@@ -9,6 +9,7 @@
 - `model-usage.js`：DeepSeek 每日用量采集、ccusage Codex 采集和七天数据归一化；相关统计与图表测试为 `model-usage.test.js`、`model-usage-ui.test.js`。
 - `workbuddy-usage.js`：本机 WorkBuddy 网关登录和每日统计采集。
 - `activity-watch.js`：本机 ActivityWatch 按日查询和应用、小时统计；`/api/activity` 为页面数据入口。
+- `activity-categories.js`：分类编辑、普通程序名/关键词生成规则、原生校验、备份与 ActivityWatch 设置保存；`/api/activity/categories` 提供读取和保存。
 - `clash-status.js`：Clash 运行模式与代理出口 IP 地理位置；独立 `/api/clash` 接口，不阻塞平台统计。
 - `desktop-panel/main.js`：Electron 窗口、托盘、设置、Markdown 渲染与待办修改、文章 IPC、本地模型和 DeepSeek 对话。
 - `desktop-panel/panel-preload.js`：隔离界面的 IPC 桥接。
@@ -69,6 +70,10 @@
 - 小时时间线按分类堆叠，共用 0–1h 纵轴；分类树默认折叠，可逐层展开并切换为全天使用占比，刷新保留展开状态。分类旭日图使用本地 SVG，无外部图表服务，内外环对应分类层级，悬停/键盘聚焦查看完整路径、精确时长和全天占比。
 - 分类统计将重叠事件拆成互斥时段，最新开始的事件优先，结束后恢复仍有效的旧事件；分类、小时堆叠及树根总和均等于有效使用时长。父节点记录包含子分类的 `seconds` 以及仅本级的 `directSeconds`，分类树展开后用“本级”显示直接时长，旭日图保留对应空外环，避免重复计时。
 - 应用使用中不足 300 秒的应用放入默认折叠的“5 分钟以下的应用”分组；正好 300 秒及以上正常显示。折叠仅影响列表展示，不改变统计、应用数量和图表；用户展开后刷新/换日保留本次会话的选择。
+- 应用条形图按各分类时长分段着色，与时间线/分类树一致；一个应用可因窗口标题进入不同分类。应用统计也使用互斥有效时段，分类分段总和等于应用时长，所有应用时长总和等于有效使用时长。返回最近七天已见程序和按未分类时长降序的程序汇总，配置入口展示前 20 个主要未分类程序，可直接加入分类。
+- 分类树右侧“配置分类”打开本地编辑器；支持拖动或上/下按钮排序、新增/改名/选择父分类、颜色继承、程序选择与每行一个的完整名称、普通关键词、保留已有规则。空格不拆分；精确程序名自动转义正则元字符，仅有程序名时限制匹配 app 字段。编辑元数据存入分类 `data.dashboardRules`，旧正则不要求人工改写，也不丢弃外部新增规则。
+- ActivityWatch 原生同深度匹配取最后规则，编辑器显示高优先级在上并反向保存；子分类仍优先于父分类。aw-query 字符串保留反斜杠，`categoryQueryLiteral` 减少 JSON 额外转义以正确传入正则。保存前通过原生 categorize 校验并检查配置 revision，防止覆盖其他窗口更新；原分类设置备份在数据目录 `activity-category-backups/`，保存失败尝试回滚所有已写键。
+- 旧版只更新 `classes`；使用分类集时保存为 `personal-dashboard` 分类集并启用它，原分类集完整保留。不修改 AW 原始事件或其他设置。保存后失效所有日期缓存；失效前的在途结果不能重新写回旧缓存。
 - 同一天请求合并，结果缓存 30 秒，强制刷新跳过缓存；查询超时 10 秒。页面仅在显示时每分钟更新；连接失败或记录缺失显示明确错误，零记录显示空态。
 
 ### 每日文章推荐
@@ -95,6 +100,7 @@
 - 发布：`npm test`、`npm run test:ui`、`npm run package:windows`；源码与压缩包均不包含密钥、登录态、个人缓存、日志、测试截图或备份。Node.js 运行时许可证位于 `scripts/licenses/node-LICENSE.txt`；CI 固定 Node 22.17.1 与该许可证版本一致。
 - 模型用量：`node --test model-usage.test.js workbuddy-usage.test.js model-usage-ui.test.js`；UI 测试同样支持 `DASHBOARD_TEST_BROWSER`，覆盖跨月/换日、缓存和价格口径、WorkBuddy 登录与积分、缺失/失败状态、三色堆叠、悬停和键盘提示以及窄面板布局。
 - 电脑使用：`node --test activity-watch.test.js activity-watch-ui.test.js`，覆盖跨日和时段裁剪、重叠统计及分类时长守恒、父子直接时间、颜色继承、分类集优先级、缓存、原生 AFK/分类查询、日期切换、刷新、分类树展开和百分比、堆叠比例、旭日图/悬停、错误与空态、360px 排版。
+- 分类设置：`node --test activity-categories.test.js activity-categories-ui.test.js`，覆盖带空格/特殊字符的精确程序名、旧规则和外部更新保留、优先级映射、冲突校验、分类集保留与失败回滚、拖动排序、未分类程序定位/快速归类、关键词、父级配置、保存持久化及应用颜色更新。
 - Clash：`node --test clash-status.test.js clash-status-ui.test.js`，验证运行模式与系统代理、缓存和失败清理、强制刷新、真实 HTTP CONNECT 路由，以及状态行/悬停 IP/360px 长位置排版。
 - 推荐逻辑：`node --test desktop-panel/articles.test.js`，覆盖默认读完 4 篇才完成任务、跨批次累计、同篇去重计数、换日、刷新换批、目录更新和中断恢复、身份迁移，以及数量调整、收藏幂等、重启、90 天边界、同名保护和损坏记录。
 - 界面集成：`node --test desktop-panel/articles-ui.test.js`，使用临时文章与真实 IPC 处理函数，验证图片、暂停计时、自动完成、收藏、设置持久化与原有待办。

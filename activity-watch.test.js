@@ -63,6 +63,9 @@ test("category accounting clips boundaries, partitions overlaps, inherits colors
   assert.equal(work.children[0].seconds, 1200);
   assert.equal(work.children[0].color, "#aea1ff");
   assert.equal(data.categoryTree.find(node => node.name === "Uncategorized").seconds, 1200);
+  assert.equal(data.apps[0].categories.reduce((sum, category) => sum + category.seconds, 0), data.apps[0].seconds);
+  assert.equal(data.unclassifiedApps[0].app, "Code.exe");
+  assert.equal(data.unclassifiedApps[0].seconds, 1200);
   data.hours.forEach(hour => {
     assert.ok(hour.seconds <= 3600);
     assert.equal(hour.categories.reduce((sum, category) => sum + category.seconds, 0), hour.seconds);

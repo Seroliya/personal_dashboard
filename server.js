@@ -19,6 +19,8 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 const DATA_FILE = path.join(DATA_DIR, "data.json");
 const AUTH_FILE = path.join(DATA_DIR, ".auth.json");
 const USER_DATA_DIR = path.join(DATA_DIR, ".browser-data");
+const { createCategoryManager } = require("./activity-categories");
+const activityCategories = createCategoryManager({ backupDir: path.join(DATA_DIR, "activity-category-backups"), invalidate: collectActivity.invalidate });
 const IS_SILENT = process.env.SILENT === "true";
 const NMC_BASE_URL = "https://www.nmc.cn";
 const BUILTIN_WEATHER_CITIES = [
@@ -552,6 +554,15 @@ function startServer() {
         const status = await collectClashStatus(requestUrl.searchParams.get("refresh") === "1");
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
         res.end(JSON.stringify(status));
+      } else if (requestUrl.pathname === "/api/activity/categories" && ["GET", "POST"].includes(req.method)) {
+        try {
+          const result = req.method === "GET" ? await activityCategories.get() : await activityCategories.save(await readRequestJson(req));
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ error: error.message }));
+        }
       } else if (requestUrl.pathname === "/api/activity" && req.method === "GET") {
         try {
           const activity = await collectActivity(requestUrl.searchParams.get("date") || undefined,

@@ -62,6 +62,13 @@ function categoryColor(path, classes) {
   return palette[hash % palette.length];
 }
 
+function categoryQueryLiteral(classes) {
+  // aw-query strings retain backslashes; JSON's doubled regex escapes must
+  // be reduced once before passing the literal to the query interpreter.
+  return JSON.stringify(classes.filter(category => category.rule?.type != null)
+    .map(category => [category.name, category.rule])).replace(/\\\\/g, "\\");
+}
+
 // Each moment belongs to one category. On overlapping watcher records, the
 // most recently started record wins until it ends, then the previous resumes.
 function exclusiveActivity(active) {
@@ -126,11 +133,12 @@ function summarizeActivity(period, activeEvents, awayEvents, now = new Date(), c
   const exclusive = exclusiveActivity(active);
   const away = intervals(awayEvents);
   const byApp = new Map();
-  for (const item of active) {
+  for (const item of exclusive) {
     if (!byApp.has(item.app)) byApp.set(item.app, []);
-    byApp.get(item.app).push([item.start, item.end]);
+    byApp.get(item.app).push(item);
   }
-  const apps = [...byApp].map(([app, spans]) => ({ app, seconds: unionDuration(spans) }))
+  const apps = [...byApp].map(([app, spans]) => ({ app, seconds: spans.reduce((sum, item) => sum + (item.end - item.start) / 1000, 0),
+    categories: summarizeCategories(spans, classes).categories }))
     .sort((a, b) => b.seconds - a.seconds);
   const hours = Array.from({ length: 24 }, (_, hour) => {
     const start = period.start + hour * 3600000;
@@ -143,7 +151,9 @@ function summarizeActivity(period, activeEvents, awayEvents, now = new Date(), c
   });
   return { date: period.date, activeSeconds: unionDuration(active.map(item => [item.start, item.end])),
     awaySeconds: unionDuration(away.map(item => [item.start, item.end])), apps, hours,
-    ...summarizeCategories(exclusive, classes) };
+    ...summarizeCategories(exclusive, classes), unclassifiedApps: apps.map(item => ({ app: item.app,
+      seconds: item.categories.filter(category => category.path.length === 1 && category.path[0] === "Uncategorized")
+        .reduce((sum, category) => sum + category.seconds, 0) })).filter(item => item.seconds > 0).sort((a, b) => b.seconds - a.seconds) };
 }
 
 async function fetchJson(fetchImpl, url, options = {}) {
@@ -157,11 +167,13 @@ async function fetchJson(fetchImpl, url, options = {}) {
 function createActivityCollector({ fetchImpl = fetch, now = () => new Date(), hostname = os.hostname() } = {}) {
   const cache = new Map();
   const pending = new Map();
-  return async function collect(date = localDate(now()), force = false) {
+  let generation = 0;
+  async function collect(date = localDate(now()), force = false) {
     const clock = now();
     const periods = dayPeriods(date, clock);
     if (!force && cache.has(date) && clock.getTime() - cache.get(date).time < 30000) return cache.get(date).data;
     if (pending.has(date)) return pending.get(date);
+    const requestGeneration = generation;
     const request = (async () => {
       const buckets = Object.values(await fetchJson(fetchImpl, `${BASE}/buckets/`));
       const windows = buckets.filter(bucket => bucket.type === "currentwindow");
@@ -175,7 +187,7 @@ function createActivityCollector({ fetchImpl = fetch, now = () => new Date(), ho
         `windows = query_bucket(${JSON.stringify(window.id)});`,
         `afk = query_bucket(${JSON.stringify(afk.id)});`,
         'active = filter_period_intersect(windows, filter_keyvals(afk, "status", ["not-afk"]));',
-        `active = categorize(active, ${JSON.stringify(classes.filter(category => category.rule?.type != null).map(category => [category.name, category.rule]))});`,
+        `active = categorize(active, ${categoryQueryLiteral(classes)});`,
         'RETURN = [active, filter_keyvals(afk, "status", ["afk"])];',
       ];
       const results = await fetchJson(fetchImpl, `${BASE}/query/`, { method: "POST",
@@ -185,14 +197,20 @@ function createActivityCollector({ fetchImpl = fetch, now = () => new Date(), ho
         if (!Array.isArray(results[i]) || results[i].length !== 2) throw new Error("ActivityWatch 每日记录格式无效");
         return summarizeActivity(period, results[i][0], results[i][1], clock, classes);
       });
-      const data = { date, ...days[6], days: days.map(({ date, activeSeconds }) => ({ date, activeSeconds })) };
-      cache.set(date, { time: clock.getTime(), data });
+      const weekUnknown = new Map();
+      days.forEach(day => day.unclassifiedApps.forEach(item => weekUnknown.set(item.app, (weekUnknown.get(item.app) || 0) + item.seconds)));
+      const data = { date, ...days[6], days: days.map(({ date, activeSeconds }) => ({ date, activeSeconds })),
+        knownApps: [...new Set(days.flatMap(day => day.apps.map(item => item.app)))].sort(),
+        unclassifiedWeekApps: [...weekUnknown].map(([app, seconds]) => ({ app, seconds })).sort((a, b) => b.seconds - a.seconds) };
+      if (generation === requestGeneration) cache.set(date, { time: clock.getTime(), data });
       if (cache.size > 16) cache.delete(cache.keys().next().value);
       return data;
     })();
     pending.set(date, request);
-    try { return await request; } finally { pending.delete(date); }
-  };
+    try { return await request; } finally { if (pending.get(date) === request) pending.delete(date); }
+  }
+  collect.invalidate = () => { generation++; cache.clear(); pending.clear(); };
+  return collect;
 }
 
-module.exports = { localDate, dayPeriods, summarizeActivity, createActivityCollector, effectiveClasses };
+module.exports = { localDate, dayPeriods, summarizeActivity, createActivityCollector, effectiveClasses, categoryColor, categoryQueryLiteral };

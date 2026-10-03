@@ -618,8 +618,36 @@
   .activity-app-heading { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; margin-bottom: 5px; }
   .activity-app-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .activity-app-duration { flex-shrink: 0; color: #888; font-variant-numeric: tabular-nums; }
-  .activity-app-track { height: 4px; background: #f3f2fd; border-radius: 3px; }
-  .activity-app-fill { height: 100%; background: #938df0; border-radius: 3px; }
+  .activity-app-track { display: flex; height: 4px; background: #f3f2fd; border-radius: 3px; overflow: hidden; }
+  .activity-app-fill { height: 100%; flex-shrink: 0; }
+  .activity-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .activity-section-heading .activity-title { margin-bottom: 0; }
+  .activity-editor { width: min(550px, calc(100vw - 24px)); max-height: 88vh; padding: 16px; margin: auto; border: 1px solid #ddd; border-radius: 10px; color: #333; overflow: hidden; }
+  .activity-editor[open] { display: flex; flex-direction: column; }
+  .activity-editor > .activity-section-heading, .activity-editor > .activity-editor-note, .activity-editor > .setting-error, .activity-editor > .activity-editor-actions { flex-shrink: 0; }
+  #activityCategoryEditorContent { overflow-y: auto; min-height: 0; padding-right: 3px; }
+  .activity-editor::backdrop { background: #0004; }
+  .activity-editor [hidden] { display: none !important; }
+  .activity-editor h2 { font-size: 15px; }
+  .activity-editor h3 { font-size: 12px; margin: 14px 0 7px; }
+  .activity-editor-note { font-size: 11px; color: #888; line-height: 1.6; margin: 8px 0; }
+  .activity-editor-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  .activity-editor-list { max-height: 210px; overflow-y: auto; }
+  .activity-editor-item { display: flex; align-items: center; gap: 7px; padding: 7px 4px; border-bottom: 1px solid #eee; font-size: 12px; }
+  .activity-editor-item.selected { background: #f3f2fd; }
+  .activity-editor-item.drag-over { border-top: 2px solid #938df0; }
+  .activity-editor-handle { cursor: grab; color: #aaa; flex-shrink: 0; }
+  .activity-editor-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; text-align: left; }
+  .activity-editor-item button:disabled { opacity: .35; cursor: default; }
+  .activity-editor-item button { border: 0; background: none; color: #777; cursor: pointer; padding: 2px; }
+  .activity-editor-fields label { display: block; font-size: 11px; color: #777; margin-top: 9px; }
+  .activity-editor-fields input[type=text], .activity-editor-fields textarea, .activity-editor-fields select { width: 100%; padding: 6px; font: inherit; font-size: 12px; border: 1px solid #ddd; border-radius: 5px; background: #fff; color: #333; }
+  .activity-editor-fields textarea { min-height: 64px; resize: vertical; }
+  .activity-editor-fields .activity-inline-label { display: inline-flex; align-items: center; gap: 5px; }
+  .activity-unclassified-row { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 5px 0; }
+  .activity-unclassified-row select { min-width: 0; max-width: 140px; flex: 1; font-size: 11px; }
+  .activity-unclassified-row .activity-app-name { flex: 1; min-width: 0; }
+  .activity-unclassified-row button { border: 0; color: #4f46e5; background: none; cursor: pointer; white-space: nowrap; }
   .activity-minor-apps { margin-top: 12px; padding-top: 8px; border-top: 1px dashed #eee; }
   .activity-minor-apps > summary { color: #777; font-size: 12px; cursor: pointer; padding: 3px 0; }
   .activity-empty { color: #999; font-size: 12px; padding: 12px 0; }
@@ -798,7 +826,7 @@
       <div class="activity-category-legend" id="activityCategoryLegend"></div>
     </div>
     <div class="activity-section">
-      <div class="activity-title">分类树</div>
+      <div class="activity-section-heading"><div class="activity-title">分类树</div><button class="secondary-button" id="activityCategorySettings" type="button">配置分类</button></div>
       <div id="activityCategoryTree"></div>
       <label class="activity-percent-control"><input id="activityCategoryPercent" type="checkbox">显示百分比</label>
     </div>
@@ -807,6 +835,30 @@
   </div>
   <div class="activity-category-tooltip" id="activityCategoryTooltip" role="tooltip" hidden></div>
 </section>
+
+<dialog class="activity-editor" id="activityCategoryEditor">
+  <div class="activity-section-heading"><h2>配置分类</h2><button class="secondary-button" id="activityCategoryUnclassifiedJump" type="button">未分类程序</button></div>
+  <div class="activity-editor-note">拖动 ⋮⋮ 调整优先级：同级匹配时上方优先，子分类优先于父分类。</div>
+  <div class="setting-error" id="activityCategoryEditorError" role="status"></div>
+  <div id="activityCategoryEditorContent" hidden>
+    <div class="activity-editor-list" id="activityCategoryEditorList"></div>
+    <div class="activity-editor-actions"><button class="secondary-button" id="activityCategoryAdd" type="button">新增分类</button></div>
+    <div class="activity-editor-fields" id="activityCategoryFields" hidden>
+      <label>分类名称<input id="activityCategoryName" type="text" maxlength="100"></label>
+      <label>父分类<select id="activityCategoryParent"></select></label>
+      <label class="activity-inline-label"><input id="activityCategoryInheritColor" type="checkbox">继承父级颜色</label>
+      <input id="activityCategoryColor" type="color" aria-label="分类颜色">
+      <label>选择程序<select id="activityCategoryAppPicker"><option value="">选择要归入此分类的程序</option></select></label>
+      <label>程序完整名称（每行一个，空格保留）<textarea id="activityCategoryApps" placeholder="DeepSeek Harness.exe"></textarea></label>
+      <label>程序或窗口标题关键词（每行一个）<textarea id="activityCategoryKeywords" placeholder="机器人&#10;学习笔记"></textarea></label>
+      <label class="activity-inline-label" id="activityCategoryKeepLabel"><input id="activityCategoryKeepExisting" type="checkbox">保留此分类的已有匹配规则</label>
+    </div>
+    <h3 id="activityUnclassifiedHeading">主要未分类程序 · 最近七天</h3>
+    <div id="activityUnclassifiedApps"></div>
+    <div class="activity-editor-note" id="activityCategorySetNote" hidden>保存后启用当前配置，ActivityWatch 原有分类方案保留。</div>
+  </div>
+  <div class="activity-editor-actions"><button class="secondary-button" id="activityCategoryCancel" type="button">取消</button><button class="secondary-button" id="activityCategorySave" type="button" disabled>保存并更新</button></div>
+</dialog>
 
 <section class="chat-mode" id="chatMode" hidden>
   <div class="chat-card">
@@ -1061,8 +1113,15 @@ function renderActivity(data) {
     const duration = document.createElement("span"); duration.className = "activity-app-duration"; duration.textContent = activityDuration(item.seconds);
     heading.append(name, duration);
     const track = document.createElement("div"); track.className = "activity-app-track";
-    const fill = document.createElement("div"); fill.className = "activity-app-fill"; fill.style.width = `${Math.min(100, item.seconds / Math.max(1, data.activeSeconds) * 100)}%`;
-    track.append(fill); row.append(heading, track); return row;
+    const categories = item.categories || [{ path: ["Uncategorized"], color: "#ccc", seconds: item.seconds }];
+    categories.forEach(category => {
+      const fill = document.createElement("div"); fill.className = "activity-app-fill";
+      fill.style.backgroundColor = category.color;
+      fill.style.width = `${Math.min(100, category.seconds / Math.max(1, data.activeSeconds) * 100)}%`;
+      fill.title = `${category.path.join(" › ")} · ${activityExactDuration(category.seconds)}`;
+      track.append(fill);
+    });
+    row.append(heading, track); return row;
   }
   data.apps.filter(item => item.seconds >= 300).forEach(item => apps.append(appRow(item)));
   const minorApps = data.apps.filter(item => item.seconds < 300);
@@ -1074,6 +1133,167 @@ function renderActivity(data) {
     group.append(summary, ...minorApps.map(appRow)); apps.append(group);
   }
 }
+let activityCategoryDraft = [], activityCategorySelected = -1, activityCategoryRevision;
+let activityCategorySaving = false, activityCategoryDragging;
+const editorElement = id => document.getElementById(id);
+const activityRuleLines = value => [...new Set(value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))];
+function activityDraftColor(item) {
+  for (let depth = item.path.length; depth > 0; depth--) {
+    const parent = activityCategoryDraft.find(category => JSON.stringify(category.path) === JSON.stringify(item.path.slice(0, depth)));
+    if (parent?.color) return parent.color;
+  }
+  return item.inheritedColor || "#4998dc";
+}
+function activityCategoryError(message = "") { editorElement("activityCategoryEditorError").textContent = message; }
+function updateActivityCategoryForm() {
+  const item = activityCategoryDraft[activityCategorySelected];
+  if (!item) return;
+  const oldPath = item.path;
+  const parent = JSON.parse(editorElement("activityCategoryParent").value || "[]");
+  const name = editorElement("activityCategoryName").value.trim();
+  if (name) {
+    const next = [...parent, name];
+    activityCategoryDraft.forEach(child => {
+      if (child !== item && child.path.length > oldPath.length && oldPath.every((part, index) => part === child.path[index])) {
+        child.path = [...next, ...child.path.slice(oldPath.length)];
+      }
+    });
+    item.path = next;
+  }
+  item.apps = activityRuleLines(editorElement("activityCategoryApps").value);
+  item.keywords = activityRuleLines(editorElement("activityCategoryKeywords").value);
+  item.keepExisting = editorElement("activityCategoryKeepExisting").checked;
+  item.color = editorElement("activityCategoryInheritColor").checked ? null : editorElement("activityCategoryColor").value;
+}
+function moveActivityCategory(item, target) {
+  updateActivityCategoryForm();
+  const selected = activityCategoryDraft[activityCategorySelected];
+  const from = activityCategoryDraft.indexOf(item);
+  if (from < 0 || target < 0 || target >= activityCategoryDraft.length) return;
+  activityCategoryDraft.splice(from, 1); activityCategoryDraft.splice(target, 0, item);
+  activityCategorySelected = activityCategoryDraft.indexOf(selected); renderActivityCategoryEditor();
+}
+function renderActivityCategoryEditor() {
+  const list = editorElement("activityCategoryEditorList"); list.replaceChildren();
+  activityCategoryDraft.forEach((item, index) => {
+    const row = document.createElement("div"); row.className = "activity-editor-item" + (index === activityCategorySelected ? " selected" : "");
+    const handle = document.createElement("span"); handle.className = "activity-editor-handle"; handle.textContent = "⋮⋮"; handle.draggable = true; handle.title = "拖动调整优先级";
+    handle.addEventListener("dragstart", event => { activityCategoryDragging = item; event.dataTransfer.setData("text/plain", String(index)); event.dataTransfer.effectAllowed = "move"; });
+    handle.addEventListener("dragend", () => { activityCategoryDragging = null; document.querySelectorAll(".drag-over").forEach(row => row.classList.remove("drag-over")); });
+    row.addEventListener("dragover", event => { if (activityCategoryDragging) { event.preventDefault(); row.classList.add("drag-over"); } });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", event => { event.preventDefault(); row.classList.remove("drag-over"); if (activityCategoryDragging) moveActivityCategory(activityCategoryDragging, index); activityCategoryDragging = null; });
+    const swatch = document.createElement("span"); swatch.className = "activity-category-swatch"; swatch.style.backgroundColor = activityDraftColor(item);
+    const name = document.createElement("button"); name.className = "activity-editor-name"; name.textContent = item.path.join(" › "); name.title = name.textContent;
+    name.addEventListener("click", () => { updateActivityCategoryForm(); activityCategorySelected = index; renderActivityCategoryEditor(); });
+    row.append(handle, swatch, name);
+    for (const [label, delta] of [["↑", -1], ["↓", 1]]) {
+      const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.setAttribute("aria-label", `${item.path.join(" › ")}优先级${delta < 0 ? "上移" : "下移"}`);
+      button.disabled = index + delta < 0 || index + delta >= activityCategoryDraft.length;
+      button.addEventListener("click", () => moveActivityCategory(item, index + delta)); row.append(button);
+    }
+    list.append(row);
+  });
+  const item = activityCategoryDraft[activityCategorySelected];
+  editorElement("activityCategoryFields").hidden = !item;
+  if (item) {
+    editorElement("activityCategoryName").value = item.path.at(-1);
+    const parent = editorElement("activityCategoryParent"); parent.replaceChildren(new Option("无（顶级分类）", "[]"));
+    activityCategoryDraft.forEach(category => {
+      if (category !== item && !(category.path.length >= item.path.length && item.path.every((part, index) => part === category.path[index]))) {
+        parent.append(new Option(category.path.join(" › "), JSON.stringify(category.path)));
+      }
+    });
+    const parentPath = JSON.stringify(item.path.slice(0, -1));
+    if (![...parent.options].some(option => option.value === parentPath)) parent.append(new Option(item.path.slice(0, -1).join(" › "), parentPath));
+    parent.value = parentPath;
+    editorElement("activityCategoryApps").value = item.apps.join("\n");
+    editorElement("activityCategoryKeywords").value = item.keywords.join("\n");
+    editorElement("activityCategoryKeepExisting").checked = item.keepExisting;
+    editorElement("activityCategoryKeepLabel").hidden = !item.hasExistingRule;
+    editorElement("activityCategoryInheritColor").checked = !item.color;
+    editorElement("activityCategoryColor").value = activityDraftColor(item);
+    editorElement("activityCategoryColor").disabled = !item.color;
+    const picker = editorElement("activityCategoryAppPicker"); picker.replaceChildren(new Option("选择要归入此分类的程序", ""));
+    (latestActivityData?.knownApps || latestActivityData?.apps.map(item => item.app) || []).forEach(app => picker.append(new Option(app, app)));
+  }
+  renderActivityUnclassified();
+}
+function renderActivityUnclassified() {
+  const container = editorElement("activityUnclassifiedApps"); container.replaceChildren();
+  const source = latestActivityData?.unclassifiedWeekApps || latestActivityData?.unclassifiedApps || [];
+  const assigned = new Set(activityCategoryDraft.flatMap(item => item.apps.map(app => app.toLowerCase())));
+  const remaining = source.filter(item => !assigned.has(item.app.toLowerCase()));
+  if (!remaining.length) { const text = document.createElement("div"); text.className = "activity-editor-note"; text.textContent = "没有待归类的程序"; container.append(text); }
+  remaining.slice(0, 20).forEach(item => {
+    const row = document.createElement("div"); row.className = "activity-unclassified-row";
+    const name = document.createElement("span"); name.className = "activity-app-name"; name.textContent = item.app; name.title = item.app;
+    const duration = document.createElement("span"); duration.className = "activity-app-duration"; duration.textContent = activityExactDuration(item.seconds);
+    const select = document.createElement("select"); select.setAttribute("aria-label", `${item.app}归入分类`);
+    activityCategoryDraft.forEach((category, index) => select.append(new Option(category.path.join(" › "), String(index))));
+    const add = document.createElement("button"); add.type = "button"; add.textContent = "归入"; add.disabled = !activityCategoryDraft.length;
+    add.addEventListener("click", () => {
+      updateActivityCategoryForm();
+      const index = Number(select.value), category = activityCategoryDraft[index];
+      if (!category) return;
+      if (!category.apps.includes(item.app)) category.apps.push(item.app);
+      activityCategorySelected = index; renderActivityCategoryEditor();
+    });
+    row.append(name, duration, select, add); container.append(row);
+  });
+}
+async function openActivityCategoryEditor() {
+  const dialog = editorElement("activityCategoryEditor");
+  hideActivityCategoryTooltip(); dialog.showModal(); activityCategoryError("读取中…");
+  editorElement("activityCategoryEditorContent").hidden = true; editorElement("activityCategorySave").disabled = true;
+  try {
+    const response = await fetch("/api/activity/categories", { signal: AbortSignal.timeout(12000) });
+    const data = await response.json(); if (!response.ok) throw new Error(data.error || "分类读取失败");
+    if (!dialog.open) return;
+    activityCategoryDraft = structuredClone(data.categories); activityCategoryRevision = data.revision;
+    activityCategorySelected = activityCategoryDraft.length ? 0 : -1;
+    editorElement("activityCategorySetNote").hidden = !data.usesCategorySets;
+    renderActivityCategoryEditor(); activityCategoryError();
+    editorElement("activityCategoryEditorContent").hidden = false; editorElement("activityCategorySave").disabled = false;
+  } catch (error) { activityCategoryError(error.message || "无法读取分类"); }
+}
+editorElement("activityCategorySettings").addEventListener("click", () => void openActivityCategoryEditor());
+editorElement("activityCategoryUnclassifiedJump").addEventListener("click", () => editorElement("activityUnclassifiedHeading").scrollIntoView({ block: "start" }));
+editorElement("activityCategoryCancel").addEventListener("click", () => editorElement("activityCategoryEditor").close());
+editorElement("activityCategoryEditor").addEventListener("cancel", event => { if (activityCategorySaving) event.preventDefault(); });
+editorElement("activityCategoryAdd").addEventListener("click", () => {
+  updateActivityCategoryForm();
+  let name = "新分类", i = 2;
+  while (activityCategoryDraft.some(item => item.path.length === 1 && item.path[0] === name)) name = `新分类 ${i++}`;
+  activityCategoryDraft.unshift({ id: null, path: [name], color: "#4998dc", apps: [], keywords: [], keepExisting: true, hasExistingRule: false });
+  activityCategorySelected = 0; renderActivityCategoryEditor(); editorElement("activityCategoryName").focus(); editorElement("activityCategoryName").select();
+});
+for (const id of ["activityCategoryName", "activityCategoryParent", "activityCategoryInheritColor", "activityCategoryColor", "activityCategoryKeepExisting"]) {
+  editorElement(id).addEventListener("change", () => { updateActivityCategoryForm(); renderActivityCategoryEditor(); });
+}
+for (const id of ["activityCategoryApps", "activityCategoryKeywords"]) editorElement(id).addEventListener("input", updateActivityCategoryForm);
+editorElement("activityCategoryAppPicker").addEventListener("change", event => {
+  const item = activityCategoryDraft[activityCategorySelected], app = event.target.value;
+  if (item && app && !item.apps.includes(app)) { item.apps.push(app); editorElement("activityCategoryApps").value = item.apps.join("\n"); }
+  event.target.value = ""; renderActivityUnclassified();
+});
+editorElement("activityCategorySave").addEventListener("click", async () => {
+  if (activityCategorySaving) return;
+  if (!editorElement("activityCategoryFields").hidden && !editorElement("activityCategoryName").value.trim()) { activityCategoryError("请填写分类名称"); return; }
+  updateActivityCategoryForm(); activityCategorySaving = true; activityCategoryError("保存中…");
+  editorElement("activityCategorySave").disabled = true; editorElement("activityCategoryCancel").disabled = true;
+  editorElement("activityCategoryEditorContent").inert = true;
+  try {
+    const response = await fetch("/api/activity/categories", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revision: activityCategoryRevision, categories: activityCategoryDraft }) });
+    const data = await response.json(); if (!response.ok) throw new Error(data.error || "保存失败");
+    editorElement("activityCategoryEditor").close(); await loadActivity(true);
+  } catch (error) { activityCategoryError(error.message || "保存失败"); }
+  finally {
+    activityCategorySaving = false; editorElement("activityCategorySave").disabled = false;
+    editorElement("activityCategoryCancel").disabled = false; editorElement("activityCategoryEditorContent").inert = false;
+  }
+});
 async function loadActivity(force = false) {
   hideActivityCategoryTooltip();
   const dateInput = document.getElementById("activityDate");

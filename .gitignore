@@ -7,5 +7,6 @@ data.json
 backups/
 dist/
 .release-tools/
+activity-category-backups/
 desktop-panel/*-test.png
 desktop-panel/*-preview.png
