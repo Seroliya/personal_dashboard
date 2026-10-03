@@ -24,6 +24,12 @@ test("category editor: app colors, drag priority, space names, major unclassifie
     ...(process.env.DASHBOARD_TEST_BROWSER ? { executablePath: process.env.DASHBOARD_TEST_BROWSER } : {}) });
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 360, height: 900 } });
+  const matches = () => page.locator("#activityCategoryMatchChips button").evaluateAll(elements => elements.map(element => element.dataset.value));
+  async function addMatch(kind, value) {
+    await page.locator("#activityCategoryMatchKind").selectOption(kind);
+    await page.locator("#activityCategoryMatchText").fill(value);
+    await page.locator("#activityCategoryMatchText").press("Enter");
+  }
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   await page.route("**/*", async route => {
     const url = new URL(route.request().url());
@@ -58,11 +64,18 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   await page.locator("#activityCategoryEditorContent").waitFor({ state: "visible" });
   const names = page.locator(".activity-editor-name");
   assert.deepEqual(await names.allTextContents(), ["娱乐", "Work", "Programming", "Docs"]);
-  assert.match(await page.locator("#activityCategoryExistingKeywords").innerText(), /Code/);
+  assert.deepEqual(await matches(), ["Code", "github.com"]);
   assert.match(await page.locator('.activity-editor-item[data-depth="1"]').first().innerText(), /Code/);
-  await page.getByRole("button", { name: "删除已有关键词 Code", exact: true }).click();
-  assert.equal(await page.getByRole("button", { name: "删除已有关键词 Code", exact: true }).count(), 0);
+  await page.getByRole("button", { name: "删除条目 Code", exact: true }).click();
+  assert.equal(await page.getByRole("button", { name: "删除条目 Code", exact: true }).count(), 0);
   assert.equal(await page.locator("#activityCategoryExistingPattern").textContent(), "github\\.com|(Power|Shell)");
+  await addMatch("keywords", "临时关键词");
+  await addMatch("apps", "Temp App.exe");
+  assert.deepEqual(await matches(), ["github.com", "Temp App.exe", "临时关键词"]);
+  const fonts = await page.locator("#activityCategoryMatchChips button").evaluateAll(elements => elements.map(element => getComputedStyle(element).fontSize));
+  assert.deepEqual(fonts, ["12px", "12px", "12px"]);
+  await page.getByRole("button", { name: "删除条目 临时关键词", exact: true }).click();
+  await page.getByRole("button", { name: "删除条目 Temp App.exe", exact: true }).click();
   const rootRows = page.locator('.activity-editor-item[data-depth="0"]');
   await rootRows.first().locator(".activity-editor-handle").dragTo(rootRows.last());
   assert.deepEqual(await names.allTextContents(), ["Work", "Programming", "Docs", "娱乐"]);
@@ -76,10 +89,10 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   assert.equal(await page.locator("#activityUnclassifiedHeading").isVisible(), true);
   assert.equal(await page.locator("#activityUnclassifiedApps .activity-app-name").first().innerText(), "Space App.exe");
   await page.locator("#activityUnclassifiedApps .activity-unclassified-row button").first().click();
-  assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe");
+  assert.deepEqual(await matches(), ["Space App.exe"]);
   await page.locator("#activityCategoryAppPicker").selectOption("Small Tool.exe");
-  assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe\nSmall Tool.exe");
-  await page.locator("#activityCategoryKeywords").fill("学习 笔记");
+  assert.deepEqual(await matches(), ["Space App.exe", "Small Tool.exe"]);
+  await addMatch("keywords", "学习 笔记");
   await page.locator("#activityCategoryColor").fill("#ff6699");
   await page.locator("#activityCategoryColor").dispatchEvent("change");
   await page.locator("#activityCategoryAdd").click();
@@ -109,22 +122,20 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   await page.locator("#activityCategorySettings").click();
   await page.locator("#activityCategoryEditorContent").waitFor({ state: "visible" });
   await names.filter({ hasText: /^Work$/ }).click();
-  assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe\nSmall Tool.exe");
+  assert.deepEqual(await matches(), ["Space App.exe", "Small Tool.exe", "学习 笔记"]);
   assert.match(await page.locator('.activity-editor-item[data-depth="0"]').first().innerText(), /Space App\.exe.*学习 笔记/s);
   assert.match(await page.locator("#activityUnclassifiedApps").innerText(), /没有待归类/);
-  await page.getByRole("button", { name: "删除关键词 学习 笔记", exact: true }).click();
-  await page.getByRole("button", { name: "删除程序 Small Tool.exe", exact: true }).click();
-  assert.equal(await page.locator("#activityCategoryKeywords").inputValue(), "");
-  assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe");
+  await page.getByRole("button", { name: "删除条目 学习 笔记", exact: true }).click();
+  await page.getByRole("button", { name: "删除条目 Small Tool.exe", exact: true }).click();
+  assert.deepEqual(await matches(), ["Space App.exe"]);
   await page.locator("#activityCategorySave").click();
   await page.locator("#activityCategoryEditor").waitFor({ state: "hidden" });
   await page.locator("#activityCategorySettings").click();
   await page.locator("#activityCategoryEditorContent").waitFor({ state: "visible" });
   await names.filter({ hasText: /^Work$/ }).click();
-  assert.equal(await page.locator("#activityCategoryKeywords").inputValue(), "");
-  assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe");
+  assert.deepEqual(await matches(), ["Space App.exe"]);
   await names.filter({ hasText: /^Programming$/ }).click();
-  assert.equal(await page.getByRole("button", { name: "删除已有关键词 Code", exact: true }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "删除条目 Code", exact: true }).count(), 0);
   assert.equal(await page.locator("#activityCategoryExistingPattern").textContent(), "github\\.com|(Power|Shell)");
   await page.locator("#activityCategoryCancel").click();
   assert.deepEqual(errors, []);

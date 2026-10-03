@@ -642,9 +642,9 @@
   .activity-editor-info .activity-editor-name { display: block; width: 100%; }
   .activity-editor-rule-summary { margin-top: 3px; font-size: 10px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .activity-editor-existing { margin-top: 10px; font-size: 11px; color: #777; }
-  .activity-editor-keywords { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0; }
+  .activity-editor-keywords { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0; font-size: 12px; line-height: 1.5; }
   .activity-editor-keyword { padding: 2px 5px; border-radius: 4px; background: #f3f2fd; color: #666; overflow-wrap: anywhere; }
-  button.activity-editor-keyword { border: 0; cursor: pointer; font: inherit; text-align: left; }
+  button.activity-editor-keyword { border: 0; cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
   button.activity-editor-keyword:hover { background: #fce7ed; color: #a33; }
   .activity-editor-existing pre { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 5px; font-size: 10px; }
   .activity-editor-item button:disabled { opacity: .35; cursor: default; }
@@ -652,6 +652,11 @@
   .activity-editor-fields label { display: block; font-size: 11px; color: #777; margin-top: 9px; }
   .activity-editor-fields input[type=text], .activity-editor-fields textarea, .activity-editor-fields select { width: 100%; padding: 6px; font: inherit; font-size: 12px; border: 1px solid #ddd; border-radius: 5px; background: #fff; color: #333; }
   .activity-editor-fields textarea { min-height: 64px; resize: vertical; }
+  .activity-editor-add-match { display: flex; gap: 5px; margin-top: 5px; align-items: center; }
+  .activity-editor-add-match select { width: 80px; flex-shrink: 0; }
+  .activity-editor-add-match input { min-width: 0; flex: 1; }
+  .activity-editor-add-match button { flex-shrink: 0; }
+  .activity-editor-fields .activity-editor-existing { margin-top: 10px; }
   .activity-editor-fields .activity-inline-label { display: inline-flex; align-items: center; gap: 5px; }
   .activity-unclassified-row { display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 5px 0; }
   .activity-unclassified-row select { min-width: 0; max-width: 140px; flex: 1; font-size: 11px; }
@@ -857,16 +862,18 @@
       <label>父分类<select id="activityCategoryParent"></select></label>
       <label class="activity-inline-label"><input id="activityCategoryInheritColor" type="checkbox">继承父级颜色</label>
       <input id="activityCategoryColor" type="color" aria-label="分类颜色">
-      <div class="activity-editor-existing" id="activityCategoryExisting" hidden>
-        <div>已有匹配关键词</div><div class="activity-editor-keywords" id="activityCategoryExistingKeywords"></div>
-        <details><summary>查看原有匹配规则</summary><pre id="activityCategoryExistingPattern"></pre></details>
+      <label>匹配条目</label>
+      <div class="activity-editor-keywords" id="activityCategoryMatchChips"></div>
+      <div class="activity-editor-add-match">
+        <select id="activityCategoryMatchKind" aria-label="匹配方式"><option value="keywords">关键词</option><option value="apps">程序名</option></select>
+        <input id="activityCategoryMatchText" type="text" placeholder="输入关键词" aria-label="添加匹配条目" maxlength="300">
+        <button class="secondary-button" id="activityCategoryMatchAdd" type="button">添加</button>
       </div>
       <label>选择程序<select id="activityCategoryAppPicker"><option value="">选择要归入此分类的程序</option></select></label>
-      <label>程序完整名称（每行一个，空格保留）<textarea id="activityCategoryApps" placeholder="DeepSeek Harness.exe"></textarea></label>
-      <div class="activity-editor-keywords" id="activityCategoryAppChips"></div>
-      <label>程序或窗口标题关键词（每行一个）<textarea id="activityCategoryKeywords" placeholder="机器人&#10;学习笔记"></textarea></label>
-      <div class="activity-editor-keywords" id="activityCategoryKeywordChips"></div>
-      <label class="activity-inline-label" id="activityCategoryKeepLabel"><input id="activityCategoryKeepExisting" type="checkbox">保留此分类的已有匹配规则</label>
+      <details class="activity-editor-existing" id="activityCategoryExisting" hidden>
+        <summary>高级匹配规则</summary><pre id="activityCategoryExistingPattern"></pre>
+        <label class="activity-inline-label" id="activityCategoryKeepLabel"><input id="activityCategoryKeepExisting" type="checkbox">启用此规则</label>
+      </details>
     </div>
     <h3 id="activityUnclassifiedHeading">主要未分类程序 · 最近七天</h3>
     <div id="activityUnclassifiedApps"></div>
@@ -1151,7 +1158,6 @@ function renderActivity(data) {
 let activityCategoryDraft = [], activityCategorySelected = -1, activityCategoryRevision;
 let activityCategorySaving = false, activityCategoryDragging;
 const editorElement = id => document.getElementById(id);
-const activityRuleLines = value => [...new Set(value.split(/\r?\n/).map(value => value.trim()).filter(Boolean))];
 function activityDraftColor(item) {
   for (let depth = item.path.length; depth > 0; depth--) {
     const parent = activityCategoryDraft.find(category => JSON.stringify(category.path) === JSON.stringify(item.path.slice(0, depth)));
@@ -1207,23 +1213,21 @@ function renderActivityRuleSummary(summary, item) {
 function renderActivityKeywordChips() {
   const item = activityCategoryDraft[activityCategorySelected];
   if (!item) return;
-  function chips(id, values, label, remove) {
-    const container = editorElement(id); container.replaceChildren();
-    values.forEach(value => {
+  const container = editorElement("activityCategoryMatchChips"); container.replaceChildren();
+  const values = [...new Set([...(item.keepExisting ? activityExistingKeywords(item) : []), ...item.apps, ...item.keywords])];
+  values.forEach(value => {
       const chip = document.createElement("button"); chip.type = "button"; chip.className = "activity-editor-keyword";
-      chip.textContent = `${value} ×`; chip.title = `删除${label} ${value}`; chip.setAttribute("aria-label", chip.title);
-      chip.addEventListener("click", () => { updateActivityCategoryForm(); remove(value); renderActivityKeywordChips(); refreshActivityRuleSummaries(); renderActivityUnclassified(); });
+      chip.dataset.value = value; chip.textContent = `${value} ×`; chip.title = `删除条目 ${value}`; chip.setAttribute("aria-label", chip.title);
+      chip.addEventListener("click", () => {
+        updateActivityCategoryForm();
+        item.apps = item.apps.filter(text => text !== value); item.keywords = item.keywords.filter(text => text !== value);
+        if ((item.existingKeywords || []).includes(value)) item.removedExistingKeywords = [...new Set([...(item.removedExistingKeywords || []), value])];
+        renderActivityKeywordChips(); refreshActivityRuleSummaries(); renderActivityUnclassified();
+      });
       container.append(chip);
-    });
-  }
-  chips("activityCategoryExistingKeywords", activityExistingKeywords(item), "已有关键词", value => {
-    item.removedExistingKeywords = [...new Set([...(item.removedExistingKeywords || []), value])];
   });
-  for (const [field, id, input, label] of [["apps", "activityCategoryAppChips", "activityCategoryApps", "程序"], ["keywords", "activityCategoryKeywordChips", "activityCategoryKeywords", "关键词"]]) {
-    chips(id, item[field], label, value => { item[field] = item[field].filter(text => text !== value); editorElement(input).value = item[field].join("\n"); });
-  }
   const pattern = activityExistingPattern(item);
-  editorElement("activityCategoryExisting").hidden = !pattern || !item.keepExisting;
+  editorElement("activityCategoryExisting").hidden = !pattern;
   editorElement("activityCategoryExistingPattern").textContent = pattern;
 }
 function refreshActivityRuleSummaries() {
@@ -1247,8 +1251,6 @@ function updateActivityCategoryForm() {
     });
     item.path = next;
   }
-  item.apps = activityRuleLines(editorElement("activityCategoryApps").value);
-  item.keywords = activityRuleLines(editorElement("activityCategoryKeywords").value);
   item.keepExisting = editorElement("activityCategoryKeepExisting").checked;
   item.color = editorElement("activityCategoryInheritColor").checked ? null : editorElement("activityCategoryColor").value;
 }
@@ -1310,8 +1312,7 @@ function renderActivityCategoryEditor() {
     const parentPath = JSON.stringify(item.path.slice(0, -1));
     if (![...parent.options].some(option => option.value === parentPath)) parent.append(new Option(item.path.slice(0, -1).join(" › "), parentPath));
     parent.value = parentPath;
-    editorElement("activityCategoryApps").value = item.apps.join("\n");
-    editorElement("activityCategoryKeywords").value = item.keywords.join("\n");
+    editorElement("activityCategoryMatchText").value = "";
     editorElement("activityCategoryKeepExisting").checked = item.keepExisting;
     editorElement("activityCategoryKeepLabel").hidden = !item.hasExistingRule;
     renderActivityKeywordChips();
@@ -1375,10 +1376,20 @@ editorElement("activityCategoryAdd").addEventListener("click", () => {
 for (const id of ["activityCategoryName", "activityCategoryParent", "activityCategoryInheritColor", "activityCategoryColor", "activityCategoryKeepExisting"]) {
   editorElement(id).addEventListener("change", () => { updateActivityCategoryForm(); renderActivityCategoryEditor(); });
 }
-for (const id of ["activityCategoryApps", "activityCategoryKeywords"]) editorElement(id).addEventListener("input", () => { updateActivityCategoryForm(); renderActivityKeywordChips(); refreshActivityRuleSummaries(); });
+function addActivityCategoryMatch() {
+  updateActivityCategoryForm();
+  const item = activityCategoryDraft[activityCategorySelected], input = editorElement("activityCategoryMatchText");
+  const value = input.value.trim(), kind = editorElement("activityCategoryMatchKind").value;
+  if (!item || !value) return;
+  if (!item[kind].includes(value)) item[kind].push(value);
+  input.value = ""; renderActivityKeywordChips(); refreshActivityRuleSummaries(); renderActivityUnclassified(); input.focus();
+}
+editorElement("activityCategoryMatchAdd").addEventListener("click", addActivityCategoryMatch);
+editorElement("activityCategoryMatchText").addEventListener("keydown", event => { if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); addActivityCategoryMatch(); } });
+editorElement("activityCategoryMatchKind").addEventListener("change", event => { editorElement("activityCategoryMatchText").placeholder = event.target.value === "apps" ? "完整程序名，空格保留" : "输入关键词"; });
 editorElement("activityCategoryAppPicker").addEventListener("change", event => {
   const item = activityCategoryDraft[activityCategorySelected], app = event.target.value;
-  if (item && app && !item.apps.includes(app)) { item.apps.push(app); editorElement("activityCategoryApps").value = item.apps.join("\n"); }
+  if (item && app && !item.apps.includes(app)) item.apps.push(app);
   event.target.value = ""; renderActivityKeywordChips(); renderActivityUnclassified(); refreshActivityRuleSummaries();
 });
 editorElement("activityCategorySave").addEventListener("click", async () => {
