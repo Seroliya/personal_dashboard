@@ -9,6 +9,8 @@ const { summarizeActivity, dayPeriods, categoryColor } = require("./activity-wat
 test("category editor: app colors, drag priority, space names, major unclassified apps and persistence", async t => {
   let settings = { classes: [
     { name: ["Work"], rule: { type: "none" }, data: { color: "#a4dd00" } },
+    { name: ["Work", "Docs"], rule: { type: "none" }, data: {} },
+    { name: ["娱乐"], rule: { type: "none" }, data: { color: "#fe9200" } },
     { name: ["Work", "Programming"], rule: { type: "regex", regex: "Code" }, data: { color: "#aea1ff" } },
   ] };
   let writes = 0, saveFailure = false;
@@ -55,9 +57,18 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   await page.locator("#activityCategorySettings").click();
   await page.locator("#activityCategoryEditorContent").waitFor({ state: "visible" });
   const names = page.locator(".activity-editor-name");
-  assert.deepEqual(await names.allTextContents(), ["Work › Programming", "Work"]);
-  await page.locator(".activity-editor-handle").first().dragTo(page.locator(".activity-editor-item").last());
-  assert.deepEqual(await names.allTextContents(), ["Work", "Work › Programming"]);
+  assert.deepEqual(await names.allTextContents(), ["娱乐", "Work", "Programming", "Docs"]);
+  assert.match(await page.locator("#activityCategoryExistingKeywords").innerText(), /Code/);
+  assert.match(await page.locator('.activity-editor-item[data-depth="1"]').first().innerText(), /Code/);
+  const rootRows = page.locator('.activity-editor-item[data-depth="0"]');
+  await rootRows.first().locator(".activity-editor-handle").dragTo(rootRows.last());
+  assert.deepEqual(await names.allTextContents(), ["Work", "Programming", "Docs", "娱乐"]);
+  const children = page.locator('.activity-editor-item[data-depth="1"]');
+  await children.first().locator(".activity-editor-handle").dragTo(children.last());
+  assert.deepEqual(await names.allTextContents(), ["Work", "Docs", "Programming", "娱乐"]);
+  const rootPadding = await page.locator('.activity-editor-item[data-depth="0"]').first().evaluate(el => parseFloat(getComputedStyle(el).paddingLeft));
+  const childPadding = await children.first().evaluate(el => parseFloat(getComputedStyle(el).paddingLeft));
+  assert.ok(childPadding > rootPadding);
   await page.locator("#activityCategoryUnclassifiedJump").click();
   assert.equal(await page.locator("#activityUnclassifiedHeading").isVisible(), true);
   assert.equal(await page.locator("#activityUnclassifiedApps .activity-app-name").first().innerText(), "Space App.exe");
@@ -72,7 +83,8 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   await page.locator("#activityCategoryName").fill("信息输入");
   await page.locator("#activityCategoryName").dispatchEvent("change");
   await page.locator("#activityCategoryParent").selectOption(JSON.stringify(["Work"]));
-  assert.equal(await names.first().innerText(), "Work › 信息输入");
+  assert.equal(await names.nth(1).innerText(), "信息输入");
+  assert.equal(await names.first().innerText(), "Work");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   saveFailure = true;
   await page.locator("#activityCategorySave").click();
@@ -84,7 +96,7 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   await page.locator("#activityCategoryEditor").waitFor({ state: "hidden" });
   await page.locator("#activityContent").waitFor({ state: "visible" });
   assert.equal(writes, 1);
-  const work = settings.classes.find(item => item.name.length === 1);
+  const work = settings.classes.find(item => item.name.length === 1 && item.name[0] === "Work");
   assert.deepEqual(work.data.dashboardRules.apps, ["Space App.exe", "Small Tool.exe"]);
   assert.deepEqual(work.data.dashboardRules.keywords, ["学习 笔记"]);
   assert.equal(work.data.color, "#ff6699");
@@ -94,6 +106,7 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   await page.locator("#activityCategoryEditorContent").waitFor({ state: "visible" });
   await names.filter({ hasText: /^Work$/ }).click();
   assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe\nSmall Tool.exe");
+  assert.match(await page.locator('.activity-editor-item[data-depth="0"]').first().innerText(), /Space App\.exe.*学习 笔记/s);
   assert.match(await page.locator("#activityUnclassifiedApps").innerText(), /没有待归类/);
   await page.locator("#activityCategoryCancel").click();
   assert.deepEqual(errors, []);

@@ -638,6 +638,13 @@
   .activity-editor-item.drag-over { border-top: 2px solid #938df0; }
   .activity-editor-handle { cursor: grab; color: #aaa; flex-shrink: 0; }
   .activity-editor-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; text-align: left; }
+  .activity-editor-info { flex: 1; min-width: 0; }
+  .activity-editor-info .activity-editor-name { display: block; width: 100%; }
+  .activity-editor-rule-summary { margin-top: 3px; font-size: 10px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .activity-editor-existing { margin-top: 10px; font-size: 11px; color: #777; }
+  .activity-editor-keywords { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0; }
+  .activity-editor-keyword { padding: 2px 5px; border-radius: 4px; background: #f3f2fd; color: #666; overflow-wrap: anywhere; }
+  .activity-editor-existing pre { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 5px; font-size: 10px; }
   .activity-editor-item button:disabled { opacity: .35; cursor: default; }
   .activity-editor-item button { border: 0; background: none; color: #777; cursor: pointer; padding: 2px; }
   .activity-editor-fields label { display: block; font-size: 11px; color: #777; margin-top: 9px; }
@@ -838,7 +845,7 @@
 
 <dialog class="activity-editor" id="activityCategoryEditor">
   <div class="activity-section-heading"><h2>配置分类</h2><button class="secondary-button" id="activityCategoryUnclassifiedJump" type="button">未分类程序</button></div>
-  <div class="activity-editor-note">拖动 ⋮⋮ 调整优先级：同级匹配时上方优先，子分类优先于父分类。</div>
+  <div class="activity-editor-note">拖动 ⋮⋮ 调整同一父分类下的优先级，父分类连同子分类一起移动；子分类优先于父分类。</div>
   <div class="setting-error" id="activityCategoryEditorError" role="status"></div>
   <div id="activityCategoryEditorContent" hidden>
     <div class="activity-editor-list" id="activityCategoryEditorList"></div>
@@ -848,6 +855,10 @@
       <label>父分类<select id="activityCategoryParent"></select></label>
       <label class="activity-inline-label"><input id="activityCategoryInheritColor" type="checkbox">继承父级颜色</label>
       <input id="activityCategoryColor" type="color" aria-label="分类颜色">
+      <div class="activity-editor-existing" id="activityCategoryExisting" hidden>
+        <div>已有匹配关键词</div><div class="activity-editor-keywords" id="activityCategoryExistingKeywords"></div>
+        <details><summary>查看原有匹配规则</summary><pre id="activityCategoryExistingPattern"></pre></details>
+      </div>
       <label>选择程序<select id="activityCategoryAppPicker"><option value="">选择要归入此分类的程序</option></select></label>
       <label>程序完整名称（每行一个，空格保留）<textarea id="activityCategoryApps" placeholder="DeepSeek Harness.exe"></textarea></label>
       <label>程序或窗口标题关键词（每行一个）<textarea id="activityCategoryKeywords" placeholder="机器人&#10;学习笔记"></textarea></label>
@@ -1145,6 +1156,47 @@ function activityDraftColor(item) {
   return item.inheritedColor || "#4998dc";
 }
 function activityCategoryError(message = "") { editorElement("activityCategoryEditorError").textContent = message; }
+function activityCategoryDescendant(child, parent) {
+  return child.path.length >= parent.path.length && parent.path.every((part, index) => part === child.path[index]);
+}
+function activityCategorySiblings(item) {
+  const parent = JSON.stringify(item.path.slice(0, -1));
+  return activityCategoryDraft.filter(category => JSON.stringify(category.path.slice(0, -1)) === parent);
+}
+function groupActivityCategories() {
+  const selected = activityCategoryDraft[activityCategorySelected];
+  const byPath = new Map(activityCategoryDraft.map(item => [JSON.stringify(item.path), item]));
+  activityCategoryDraft.slice().forEach(item => {
+    for (let depth = 1; depth < item.path.length; depth++) {
+      const path = item.path.slice(0, depth), key = JSON.stringify(path);
+      if (!byPath.has(key)) {
+        const parent = { id: null, path, color: null, inheritedColor: item.inheritedColor, apps: [], keywords: [], keepExisting: true, hasExistingRule: false };
+        byPath.set(key, parent); activityCategoryDraft.push(parent);
+      }
+    }
+  });
+  const grouped = [], visited = new Set();
+  function visit(parent) {
+    activityCategoryDraft.filter(item => JSON.stringify(item.path.slice(0, -1)) === JSON.stringify(parent)).forEach(item => {
+      if (visited.has(item)) return; visited.add(item);
+      grouped.push(item); visit(item.path);
+    });
+  }
+  visit([]); activityCategoryDraft = grouped;
+  activityCategorySelected = selected ? grouped.indexOf(selected) : -1;
+}
+function renderActivityRuleSummary(summary, item) {
+  const existing = item.keepExisting ? item.existingKeywords || [] : [];
+  const labels = [...new Set([...item.apps, ...item.keywords, ...existing])];
+  summary.textContent = labels.length ? labels.join(" · ") : item.keepExisting && item.existingPattern ? `规则：${item.existingPattern}` : "无匹配规则";
+  summary.title = [...labels, item.keepExisting && item.existingPattern].filter(Boolean).join("\n");
+}
+function refreshActivityRuleSummaries() {
+  document.querySelectorAll(".activity-editor-item").forEach(row => {
+    const item = activityCategoryDraft.find(item => JSON.stringify(item.path) === row.dataset.path);
+    if (item) renderActivityRuleSummary(row.querySelector(".activity-editor-rule-summary"), item);
+  });
+}
 function updateActivityCategoryForm() {
   const item = activityCategoryDraft[activityCategorySelected];
   if (!item) return;
@@ -1170,13 +1222,25 @@ function moveActivityCategory(item, target) {
   const selected = activityCategoryDraft[activityCategorySelected];
   const from = activityCategoryDraft.indexOf(item);
   if (from < 0 || target < 0 || target >= activityCategoryDraft.length) return;
-  activityCategoryDraft.splice(from, 1); activityCategoryDraft.splice(target, 0, item);
+  const peer = activityCategoryDraft[target];
+  if (item === peer) return;
+  if (!activityCategorySiblings(item).includes(peer)) {
+    activityCategoryError("请在同一父分类下排序；变更父分类可使用下方的父分类选项"); return;
+  }
+  const block = activityCategoryDraft.filter(child => activityCategoryDescendant(child, item));
+  const peerBlock = activityCategoryDraft.filter(child => activityCategoryDescendant(child, peer));
+  activityCategoryDraft = activityCategoryDraft.filter(child => !block.includes(child));
+  const insertion = from < target ? activityCategoryDraft.indexOf(peerBlock.at(-1)) + 1 : activityCategoryDraft.indexOf(peer);
+  activityCategoryDraft.splice(insertion, 0, ...block); activityCategoryError();
   activityCategorySelected = activityCategoryDraft.indexOf(selected); renderActivityCategoryEditor();
 }
 function renderActivityCategoryEditor() {
+  groupActivityCategories();
   const list = editorElement("activityCategoryEditorList"); list.replaceChildren();
   activityCategoryDraft.forEach((item, index) => {
     const row = document.createElement("div"); row.className = "activity-editor-item" + (index === activityCategorySelected ? " selected" : "");
+    row.dataset.path = JSON.stringify(item.path); row.dataset.depth = String(item.path.length - 1);
+    row.style.paddingLeft = `${4 + (item.path.length - 1) * 14}px`;
     const handle = document.createElement("span"); handle.className = "activity-editor-handle"; handle.textContent = "⋮⋮"; handle.draggable = true; handle.title = "拖动调整优先级";
     handle.addEventListener("dragstart", event => { activityCategoryDragging = item; event.dataTransfer.setData("text/plain", String(index)); event.dataTransfer.effectAllowed = "move"; });
     handle.addEventListener("dragend", () => { activityCategoryDragging = null; document.querySelectorAll(".drag-over").forEach(row => row.classList.remove("drag-over")); });
@@ -1184,13 +1248,17 @@ function renderActivityCategoryEditor() {
     row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
     row.addEventListener("drop", event => { event.preventDefault(); row.classList.remove("drag-over"); if (activityCategoryDragging) moveActivityCategory(activityCategoryDragging, index); activityCategoryDragging = null; });
     const swatch = document.createElement("span"); swatch.className = "activity-category-swatch"; swatch.style.backgroundColor = activityDraftColor(item);
-    const name = document.createElement("button"); name.className = "activity-editor-name"; name.textContent = item.path.join(" › "); name.title = name.textContent;
+    const name = document.createElement("button"); name.className = "activity-editor-name"; name.textContent = item.path.at(-1); name.title = item.path.join(" › ");
     name.addEventListener("click", () => { updateActivityCategoryForm(); activityCategorySelected = index; renderActivityCategoryEditor(); });
-    row.append(handle, swatch, name);
+    const info = document.createElement("div"); info.className = "activity-editor-info";
+    const summary = document.createElement("div"); summary.className = "activity-editor-rule-summary";
+    renderActivityRuleSummary(summary, item);
+    info.append(name, summary); row.append(handle, swatch, info);
+    const siblings = activityCategorySiblings(item), siblingIndex = siblings.indexOf(item);
     for (const [label, delta] of [["↑", -1], ["↓", 1]]) {
       const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.setAttribute("aria-label", `${item.path.join(" › ")}优先级${delta < 0 ? "上移" : "下移"}`);
-      button.disabled = index + delta < 0 || index + delta >= activityCategoryDraft.length;
-      button.addEventListener("click", () => moveActivityCategory(item, index + delta)); row.append(button);
+      const peer = siblings[siblingIndex + delta]; button.disabled = !peer;
+      button.addEventListener("click", () => moveActivityCategory(item, activityCategoryDraft.indexOf(peer))); row.append(button);
     }
     list.append(row);
   });
@@ -1211,6 +1279,12 @@ function renderActivityCategoryEditor() {
     editorElement("activityCategoryKeywords").value = item.keywords.join("\n");
     editorElement("activityCategoryKeepExisting").checked = item.keepExisting;
     editorElement("activityCategoryKeepLabel").hidden = !item.hasExistingRule;
+    editorElement("activityCategoryExisting").hidden = !item.existingPattern;
+    const existingKeywords = editorElement("activityCategoryExistingKeywords"); existingKeywords.replaceChildren();
+    (item.existingKeywords || []).forEach(keyword => {
+      const chip = document.createElement("span"); chip.className = "activity-editor-keyword"; chip.textContent = keyword; existingKeywords.append(chip);
+    });
+    editorElement("activityCategoryExistingPattern").textContent = item.existingPattern || "";
     editorElement("activityCategoryInheritColor").checked = !item.color;
     editorElement("activityCategoryColor").value = activityDraftColor(item);
     editorElement("activityCategoryColor").disabled = !item.color;
@@ -1271,11 +1345,11 @@ editorElement("activityCategoryAdd").addEventListener("click", () => {
 for (const id of ["activityCategoryName", "activityCategoryParent", "activityCategoryInheritColor", "activityCategoryColor", "activityCategoryKeepExisting"]) {
   editorElement(id).addEventListener("change", () => { updateActivityCategoryForm(); renderActivityCategoryEditor(); });
 }
-for (const id of ["activityCategoryApps", "activityCategoryKeywords"]) editorElement(id).addEventListener("input", updateActivityCategoryForm);
+for (const id of ["activityCategoryApps", "activityCategoryKeywords"]) editorElement(id).addEventListener("input", () => { updateActivityCategoryForm(); refreshActivityRuleSummaries(); });
 editorElement("activityCategoryAppPicker").addEventListener("change", event => {
   const item = activityCategoryDraft[activityCategorySelected], app = event.target.value;
   if (item && app && !item.apps.includes(app)) { item.apps.push(app); editorElement("activityCategoryApps").value = item.apps.join("\n"); }
-  event.target.value = ""; renderActivityUnclassified();
+  event.target.value = ""; renderActivityUnclassified(); refreshActivityRuleSummaries();
 });
 editorElement("activityCategorySave").addEventListener("click", async () => {
   if (activityCategorySaving) return;

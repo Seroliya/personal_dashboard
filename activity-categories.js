@@ -26,6 +26,37 @@ function baseRuleFor(original) {
   return original?.rule || { type: "none" };
 }
 
+function literalRegexKeywords(regex) {
+  if (!regex) return [];
+  const parts = [], keywords = [];
+  let part = "", depth = 0, inClass = false;
+  for (let i = 0; i < regex.length; i++) {
+    const char = regex[i];
+    if (char === "\\") { part += char + (regex[++i] || ""); continue; }
+    if (char === "[" && !inClass) inClass = true;
+    else if (char === "]") inClass = false;
+    else if (!inClass && char === "(") depth++;
+    else if (!inClass && char === ")") depth--;
+    if (char === "|" && !depth && !inClass) { parts.push(part); part = ""; } else part += char;
+  }
+  parts.push(part);
+  for (const source of parts) {
+    const token = source.replace(/^\^/, "").replace(/(?<!\\)\$$/, "");
+    let text = "", valid = true;
+    for (let i = 0; i < token.length; i++) {
+      const char = token[i];
+      if (char === "\\") {
+        const escaped = token[++i];
+        if (escaped && /[.*+?^${}()|[\]\\]/.test(escaped)) text += escaped;
+        else { valid = false; break; }
+      } else if (/[.*+?^${}()|[\]]/.test(char)) { valid = false; break; }
+      else text += char;
+    }
+    if (valid && text) keywords.push(text);
+  }
+  return [...new Set(keywords)];
+}
+
 function compileCategory(item, original, id) {
   const lines = value => {
     if (!Array.isArray(value) || value.length > 100 || value.some(text => typeof text !== "string" || !text.trim() || text.length > 300 || /[\r\n\0]/.test(text))) {
@@ -61,6 +92,7 @@ function createCategoryManager({ fetchImpl = fetch, backupDir, invalidate = () =
         color: category.data?.color?.replace(/^#([a-f\d])([a-f\d])([a-f\d])$/i, "#$1$1$2$2$3$3") || null,
         inheritedColor: categoryColor(category.name, classes), apps: category.data?.dashboardRules?.apps || [],
         keywords: category.data?.dashboardRules?.keywords || [], keepExisting: true,
+        existingPattern: baseRuleFor(category).regex || "", existingKeywords: literalRegexKeywords(baseRuleFor(category).regex),
         hasExistingRule: baseRuleFor(category).type === "regex" })) };
   }
   async function get() { return present(await request("/settings")); }
@@ -115,4 +147,4 @@ function createCategoryManager({ fetchImpl = fetch, backupDir, invalidate = () =
   }
   return { get, save };
 }
-module.exports = { createCategoryManager, compileCategory, escapeRegex };
+module.exports = { createCategoryManager, compileCategory, escapeRegex, literalRegexKeywords };

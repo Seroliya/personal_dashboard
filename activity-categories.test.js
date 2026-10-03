@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createCategoryManager, compileCategory } = require("./activity-categories");
+const { createCategoryManager, compileCategory, literalRegexKeywords } = require("./activity-categories");
 const { categoryQueryLiteral } = require("./activity-watch");
 
 test("plain app names preserve spaces, escape punctuation, match exactly and retain legacy rules", () => {
@@ -24,6 +24,12 @@ test("plain app names preserve spaces, escape punctuation, match exactly and ret
   assert.equal(updated.rule.regex, "external change");
 });
 
+test("existing keyword display decodes literals without treating advanced expressions as plain keywords", () => {
+  assert.deepEqual(literalRegexKeywords("GitHub|DeepSeek Harness|github\\.com|^Settings$|项目\\|笔记"),
+    ["GitHub", "DeepSeek Harness", "github.com", "Settings", "项目|笔记"]);
+  assert.deepEqual(literalRegexKeywords("Code|(Power|Shell)|\\d+|x.*|C\\+\\+"), ["Code", "C++"]);
+});
+
 function fixture(options = {}) {
   let state = structuredClone(options.state || { classes: [
     { id: 0, name: ["First"], rule: { type: "regex", regex: "legacy" }, data: { color: "#A4DD00" } },
@@ -45,6 +51,8 @@ function fixture(options = {}) {
 test("save converts top-first priority to native order, persists editable lists and invalidates cache", async () => {
   const f = fixture(), draft = await f.manager.get();
   assert.deepEqual(draft.categories.map(category => category.path[0]), ["Second", "First"]);
+  assert.deepEqual(draft.categories[1].existingKeywords, ["legacy"]);
+  assert.equal(draft.categories[1].existingPattern, "legacy");
   draft.categories.reverse(); draft.categories[0].apps = ["My App.exe"];
   const saved = await f.manager.save(draft);
   assert.equal(f.state().unrelated, "keep");
