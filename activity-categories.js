@@ -133,7 +133,9 @@ function createCategoryManager({ fetchImpl = fetch, backupDir, invalidate = () =
       const bucket = buckets.find(bucket => bucket.type === "currentwindow");
       if (bucket) await request("/query/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         timeperiods: [`${new Date(0).toISOString()}/${new Date(1000).toISOString()}`],
-        query: [`RETURN = categorize(query_bucket(${JSON.stringify(bucket.id)}), ${categoryQueryLiteral(classes)});`],
+        // aw-query cannot reliably evaluate nested calls; use the same two
+        // statements as the usage collector so validation accepts valid rules.
+        query: [`events = query_bucket(${JSON.stringify(bucket.id)});`, `RETURN = categorize(events, ${categoryQueryLiteral(classes)});`],
       }) });
       if (backupDir) {
         await fs.mkdir(backupDir, { recursive: true });

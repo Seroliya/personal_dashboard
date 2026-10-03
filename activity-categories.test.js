@@ -54,7 +54,14 @@ function fixture(options = {}) {
   const manager = createCategoryManager({ invalidate: () => invalidations++, fetchImpl: async (url, init = {}) => {
     if (url.endsWith("/settings")) return new Response(JSON.stringify(state));
     if (url.endsWith("/buckets/")) return new Response(JSON.stringify({ w: { id: "w", type: "currentwindow" } }));
-    if (url.endsWith("/query/")) { assert.match(JSON.parse(init.body).query.join(""), /categorize/); return new Response("[[]]"); }
+    if (url.endsWith("/query/")) {
+      const query = JSON.parse(init.body).query;
+      // The native interpreter rejects nested function calls with HTTP 400.
+      if (/categorize\(query_bucket\(/.test(query.join(""))) return new Response("{}", { status: 400 });
+      assert.match(query[0], /^events = query_bucket\("w"\);$/);
+      assert.match(query[1], /^RETURN = categorize\(events, /);
+      return new Response("[[]]");
+    }
     const key = url.split("/").at(-1), value = JSON.parse(init.body);
     writes.push({ key, value });
     if (key === options.failKey && failures-- > 0) return new Response("{}", { status: 500 });
