@@ -38,8 +38,13 @@ test("computer usage page: day navigation, charts, refresh, empty/error states a
             { path: ["Work"], color: "#a4dd00", seconds: 600 },
           ] : hour === 9 ? [{ path: ["社交流"], color: "#fda1ff", seconds: 3600 }] : hour === 10 ? [{ path: [maliciousName], color: "#ccc", seconds: 60 }] : [],
         })), categoryTree,
-        apps: empty ? [] : [{ app: "Code.exe", seconds: 3300 }, { app: "Social.exe", seconds: 3600 },
-          { app: "ExactlyFiveMinutes.exe", seconds: 300 }, { app: maliciousName, seconds: 60 }],
+        apps: empty ? [] : [{ app: "Code.exe", seconds: 3300, categories: [
+          { path: ["Work"], color: "#a4dd00", seconds: 300 },
+          { path: ["Work", "Programming"], color: "#aea1ff", seconds: 1200 },
+          { path: ["Work", "Programming", "Vibe Coding"], color: "#aea1ff", seconds: 1800 },
+        ] }, { app: "Social.exe", seconds: 3600, categories: [{ path: ["社交流"], color: "#fda1ff", seconds: 3600 }] },
+          { app: "ExactlyFiveMinutes.exe", seconds: 300, categories: [{ path: ["Work"], color: "#a4dd00", seconds: 300 }] },
+          { app: maliciousName, seconds: 60, categories: [{ path: [maliciousName], color: "#ccc", seconds: 60 }] }],
       } });
     }
     if (url.pathname.startsWith("/api/")) return route.fulfill({ json: {} });
@@ -66,16 +71,28 @@ test("computer usage page: day navigation, charts, refresh, empty/error states a
   assert.match(await page.locator("#activityCategoryTooltip").innerText(), /8:00–9:00.*Work › Programming › Vibe Coding.*30分 · 50%/s);
   await page.keyboard.press("Escape");
   assert.equal(await page.locator("#activityCategoryTooltip").isVisible(), false);
-  const work = page.locator("#activityCategoryTree > details");
+  const work = page.locator("#activityCategoryTree > details").first();
   assert.equal(await work.getAttribute("open"), null);
   await work.locator(":scope > summary").click();
-  assert.equal(await work.locator(".activity-category-children > details").isVisible(), true);
-  await work.locator(".activity-category-children > details > summary").click();
+  const programming = work.locator(":scope > .activity-category-children > details");
+  assert.equal(await programming.isVisible(), true);
+  await programming.locator(":scope > summary").click();
   assert.match(await work.innerText(), /Vibe Coding/);
-  assert.match(await work.innerText(), /本级/);
+  const vibe = programming.locator(":scope > .activity-category-children > details");
+  await vibe.locator(":scope > summary").click();
+  const vibeApp = vibe.locator(".activity-category-program");
+  assert.equal(await vibeApp.locator(".activity-category-name").innerText(), "Code");
+  assert.equal(await vibeApp.locator(".activity-category-time").innerText(), "30分");
+  assert.match(await vibeApp.getAttribute("title"), /Work › Programming › Vibe Coding › Code\.exe/);
+  assert.equal(await programming.locator(":scope > .activity-category-children > .activity-category-program .activity-category-time").innerText(), "20分");
+  assert.deepEqual(await work.locator(":scope > .activity-category-children > .activity-category-program .activity-category-time").allTextContents(), ["5分", "5分"]);
+  const social = page.locator("#activityCategoryTree > details").nth(1);
+  await social.locator(":scope > summary").click();
+  assert.equal(await social.locator(".activity-category-program .activity-category-name").innerText(), "Social");
   await page.locator("#activityCategoryPercent").check();
-  assert.equal(await page.locator("#activityCategoryTree > details > summary .activity-category-time").innerText(), "49.6%");
-  assert.equal(await page.locator("#activityCategoryTree details[open]").count(), 2);
+  assert.equal(await work.locator(":scope > summary .activity-category-time").innerText(), "49.6%");
+  assert.equal(await vibeApp.locator(".activity-category-time").innerText(), "24.8%");
+  assert.equal(await page.locator("#activityCategoryTree details[open]").count(), 4);
   assert.equal(await page.locator("#activityCategoryTree img").count(), 0);
   assert.equal(await page.locator("#activitySunburst svg .activity-sunburst-sector").count(), 5);
   const workSector = page.locator("#activitySunburst .activity-sunburst-sector").first();
@@ -97,6 +114,8 @@ test("computer usage page: day navigation, charts, refresh, empty/error states a
   await page.locator("#activityPrevious").click();
   await page.waitForFunction(() => !document.getElementById("activityRefresh").disabled);
   assert.notEqual(await page.locator("#activityDate").inputValue(), today);
+  assert.equal(await vibeApp.isVisible(), true);
+  assert.equal(await page.locator("#activityCategoryTree details[open]").count(), 4);
   assert.equal(await page.locator("#activityNext").isDisabled(), false);
   assert.equal(await page.locator("#activityMinorApps .activity-app-row").isVisible(), true);
   await page.locator("#activityDays .activity-column").first().click();

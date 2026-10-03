@@ -1016,6 +1016,14 @@ function renderActivityTimeline(data) {
 function renderActivityCategoryTree(data) {
   const tree = document.getElementById("activityCategoryTree"); tree.replaceChildren();
   const percent = document.getElementById("activityCategoryPercent").checked;
+  const programsByCategory = new Map();
+  (data.apps || []).forEach(app => (app.categories || []).forEach(category => {
+    if (category.seconds <= 0) return;
+    const key = JSON.stringify(category.path);
+    if (!programsByCategory.has(key)) programsByCategory.set(key, new Map());
+    const programs = programsByCategory.get(key);
+    programs.set(app.app, (programs.get(app.app) || 0) + category.seconds);
+  }));
   function row(node, branch) {
     const row = document.createElement(branch ? "summary" : "div");
     row.className = "activity-category-row" + (branch ? "" : " activity-category-leaf");
@@ -1029,17 +1037,24 @@ function renderActivityCategoryTree(data) {
   }
   function add(nodes, container) {
     nodes.forEach(node => {
-      if (!node.children?.length) { container.append(row(node, false)); return; }
+      const key = JSON.stringify(node.path);
+      const programs = [...(programsByCategory.get(key) || [])].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      if (!node.children?.length && !programs.length) { container.append(row(node, false)); return; }
       const details = document.createElement("details");
-      const key = JSON.stringify(node.path); details.dataset.category = key;
+      details.dataset.category = key;
       details.open = activityExpandedCategories.has(key);
       details.addEventListener("toggle", () => {
         if (details.open) activityExpandedCategories.add(key); else activityExpandedCategories.delete(key);
       });
       details.append(row(node, true));
       const children = document.createElement("div"); children.className = "activity-category-children";
-      add(node.children, children);
-      if (node.directSeconds > 0) children.append(row({ ...node, name: "本级", seconds: node.directSeconds }, false));
+      add(node.children || [], children);
+      programs.forEach(([app, seconds]) => {
+        const program = row({ name: app.replace(/\.exe$/i, ""), path: [...node.path, app], color: node.color, seconds }, false);
+        program.classList.add("activity-category-program"); program.dataset.app = app;
+        children.append(program);
+      });
+      if (!programs.length && node.children?.length && node.directSeconds > 0) children.append(row({ ...node, name: "本级", seconds: node.directSeconds }, false));
       details.append(children); container.append(details);
     });
   }
