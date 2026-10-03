@@ -30,6 +30,22 @@ test("existing keyword display decodes literals without treating advanced expres
   assert.deepEqual(literalRegexKeywords("Code|(Power|Shell)|\\d+|x.*|C\\+\\+"), ["Code", "C++"]);
 });
 
+test("X domain keywords recognize browser page titles and upgrade without retaining deleted generated rules", () => {
+  const original = { name: ["信息输入", "文字"], rule: { type: "regex", regex: "知乎|(?i:x\\.com)" },
+    data: { dashboardRules: { apps: [], keywords: ["x.com"], baseRule: { type: "regex", regex: "知乎" } } } };
+  const upgraded = compileCategory({ path: original.name, keywords: ["x.com"] }, original, 0);
+  const regex = new RegExp(upgraded.rule.regex.replace(/\(\?i:/g, "(?:"), "i");
+  for (const title of ["Home / X", "首页 / X - Google Chrome", "消息 / X 和另外 17 个页面 - 个人 - Microsoft​ Edge", "Home / X and 2 other tabs - Google Chrome", "Search / Twitter - Mozilla Firefox", "https://x.com/home", "知乎"]) assert.ok(regex.test(title), title);
+  for (const title of ["Project X - Google Chrome", "Example / XYZ - Google Chrome", "Example / Xylophone", "Vibe Coding - Google Chrome"]) assert.equal(regex.test(title), false, title);
+  assert.deepEqual(upgraded.data.dashboardRules.baseRule, { type: "regex", regex: "知乎" });
+  const removed = compileCategory({ path: original.name, keywords: [] }, upgraded, 0);
+  assert.equal(removed.rule.regex, "知乎");
+  const removedBeforeUpgrade = compileCategory({ path: original.name, keywords: [] }, original, 0);
+  assert.equal(removedBeforeUpgrade.rule.regex, "知乎");
+  upgraded.rule.regex += "|external";
+  assert.match(compileCategory({ path: original.name, keywords: [] }, upgraded, 0).rule.regex, /external$/);
+});
+
 test("removing existing keywords removes only their alternatives and persists the reduced rule", () => {
   const original = { name: ["Work"], rule: { type: "regex", regex: "Code|github\\.com|(Power|Shell)|^Settings$|Code", ignore_case: true, select_keys: ["app"] } };
   const removed = compileCategory({ path: ["Work"], removedExistingKeywords: ["Code", "github.com"] }, original, 0);

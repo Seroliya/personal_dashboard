@@ -8,10 +8,15 @@ const KEYS = ["classes", "category_sets", "active_set_ids"];
 const revisionOf = settings => crypto.createHash("sha256").update(JSON.stringify(KEYS.map(key => settings[key] ?? null))).digest("hex");
 const escapeRegex = text => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function buildRule(baseRule, apps, keywords) {
+function buildRule(baseRule, apps, keywords, websiteTitles = true) {
   const expressions = [];
   if (apps.length) expressions.push(`^(?:${apps.map(escapeRegex).join("|")})$`);
   expressions.push(...keywords.map(escapeRegex));
+  // Window watchers record the page title, usually "… / X", without its URL.
+  // Keep the literal domain match and recognize the site's title marker too.
+  if (websiteTitles && keywords.some(keyword => /^(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/?$/i.test(keyword))) {
+    expressions.push("\\s/\\s(?:X|Twitter)(?=$|\\s+(?:[-–—]|和另外\\s+\\d+\\s*个页面|and\\s+\\d+\\s+other\\s+tabs?))");
+  }
   const base = baseRule.type === "regex" && baseRule.regex ? baseRule.regex : "";
   const generated = expressions.length ? `(?i:${expressions.join("|")})` : "";
   const regex = [base, generated].filter(Boolean).join("|");
@@ -22,7 +27,8 @@ function buildRule(baseRule, apps, keywords) {
 }
 function baseRuleFor(original) {
   const managed = original?.data?.dashboardRules;
-  if (managed && isDeepStrictEqual(buildRule(managed.baseRule, managed.apps, managed.keywords), original.rule)) return managed.baseRule;
+  if (managed && (isDeepStrictEqual(buildRule(managed.baseRule, managed.apps, managed.keywords), original.rule) ||
+      isDeepStrictEqual(buildRule(managed.baseRule, managed.apps, managed.keywords, false), original.rule))) return managed.baseRule;
   return original?.rule || { type: "none" };
 }
 
