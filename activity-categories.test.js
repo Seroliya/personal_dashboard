@@ -30,6 +30,21 @@ test("existing keyword display decodes literals without treating advanced expres
   assert.deepEqual(literalRegexKeywords("Code|(Power|Shell)|\\d+|x.*|C\\+\\+"), ["Code", "C++"]);
 });
 
+test("removing existing keywords removes only their alternatives and persists the reduced rule", () => {
+  const original = { name: ["Work"], rule: { type: "regex", regex: "Code|github\\.com|(Power|Shell)|^Settings$|Code", ignore_case: true, select_keys: ["app"] } };
+  const removed = compileCategory({ path: ["Work"], removedExistingKeywords: ["Code", "github.com"] }, original, 0);
+  assert.deepEqual(removed.rule, { ...original.rule, regex: "(Power|Shell)|^Settings$" });
+  assert.equal(new RegExp(removed.rule.regex, "i").test("Code"), false);
+  assert.equal(new RegExp(removed.rule.regex, "i").test("Power"), true);
+  const reopened = compileCategory({ path: ["Work"], removedExistingKeywords: ["Settings"] }, removed, 0);
+  assert.equal(reopened.rule.regex, "(Power|Shell)");
+  const all = compileCategory({ path: ["Only"], removedExistingKeywords: ["Code"] }, { rule: { type: "regex", regex: "Code" } }, 0);
+  assert.deepEqual(all.rule, { type: "none" });
+  const emptyAlternative = compileCategory({ path: ["Any"], removedExistingKeywords: ["Code"] }, { rule: { type: "regex", regex: "Code|" } }, 0);
+  assert.equal(new RegExp(emptyAlternative.rule.regex).test("anything"), true);
+  assert.throws(() => compileCategory({ path: ["Work"], removedExistingKeywords: ["Power"] }, original, 0), /已有关键词无效/);
+});
+
 function fixture(options = {}) {
   let state = structuredClone(options.state || { classes: [
     { id: 0, name: ["First"], rule: { type: "regex", regex: "legacy" }, data: { color: "#A4DD00" } },

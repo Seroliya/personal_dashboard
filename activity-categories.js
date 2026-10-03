@@ -26,9 +26,9 @@ function baseRuleFor(original) {
   return original?.rule || { type: "none" };
 }
 
-function literalRegexKeywords(regex) {
+function regexKeywordParts(regex) {
   if (!regex) return [];
-  const parts = [], keywords = [];
+  const parts = [], entries = [];
   let part = "", depth = 0, inClass = false;
   for (let i = 0; i < regex.length; i++) {
     const char = regex[i];
@@ -52,9 +52,22 @@ function literalRegexKeywords(regex) {
       } else if (/[.*+?^${}()|[\]]/.test(char)) { valid = false; break; }
       else text += char;
     }
-    if (valid && text) keywords.push(text);
+    entries.push({ source, keyword: valid && text ? text : null });
   }
-  return [...new Set(keywords)];
+  return entries;
+}
+function literalRegexKeywords(regex) {
+  return [...new Set(regexKeywordParts(regex).map(entry => entry.keyword).filter(Boolean))];
+}
+function removeRuleKeywords(rule, removed = []) {
+  const parts = regexKeywordParts(rule.regex);
+  const available = new Set(parts.map(part => part.keyword).filter(Boolean));
+  if (!Array.isArray(removed) || removed.length > 1000 || removed.some(keyword => typeof keyword !== "string" || !available.has(keyword))) {
+    throw new Error("要删除的已有关键词无效，请重新打开分类设置");
+  }
+  if (!removed.length) return rule;
+  const remaining = parts.filter(part => !removed.includes(part.keyword));
+  return remaining.length ? { ...rule, regex: remaining.map(part => part.source).join("|") || "(?:)" } : { type: "none" };
 }
 
 function compileCategory(item, original, id) {
@@ -65,7 +78,7 @@ function compileCategory(item, original, id) {
     return [...new Set(value.map(text => text.trim()))];
   };
   const apps = lines(item.apps || []), keywords = lines(item.keywords || []);
-  const baseRule = item.keepExisting !== false ? structuredClone(baseRuleFor(original)) : { type: "none" };
+  const baseRule = item.keepExisting !== false ? removeRuleKeywords(structuredClone(baseRuleFor(original)), item.removedExistingKeywords) : { type: "none" };
   const rule = buildRule(baseRule, apps, keywords);
   const data = { ...(original?.data || {}), dashboardRules: { apps, keywords, baseRule } };
   if (item.color) {
@@ -93,6 +106,7 @@ function createCategoryManager({ fetchImpl = fetch, backupDir, invalidate = () =
         inheritedColor: categoryColor(category.name, classes), apps: category.data?.dashboardRules?.apps || [],
         keywords: category.data?.dashboardRules?.keywords || [], keepExisting: true,
         existingPattern: baseRuleFor(category).regex || "", existingKeywords: literalRegexKeywords(baseRuleFor(category).regex),
+        existingKeywordParts: regexKeywordParts(baseRuleFor(category).regex), removedExistingKeywords: [],
         hasExistingRule: baseRuleFor(category).type === "regex" })) };
   }
   async function get() { return present(await request("/settings")); }

@@ -11,7 +11,7 @@ test("category editor: app colors, drag priority, space names, major unclassifie
     { name: ["Work"], rule: { type: "none" }, data: { color: "#a4dd00" } },
     { name: ["Work", "Docs"], rule: { type: "none" }, data: {} },
     { name: ["娱乐"], rule: { type: "none" }, data: { color: "#fe9200" } },
-    { name: ["Work", "Programming"], rule: { type: "regex", regex: "Code" }, data: { color: "#aea1ff" } },
+    { name: ["Work", "Programming"], rule: { type: "regex", regex: "Code|github\\.com|(Power|Shell)" }, data: { color: "#aea1ff" } },
   ] };
   let writes = 0, saveFailure = false;
   const manager = createCategoryManager({ fetchImpl: async (url, options = {}) => {
@@ -60,6 +60,9 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   assert.deepEqual(await names.allTextContents(), ["娱乐", "Work", "Programming", "Docs"]);
   assert.match(await page.locator("#activityCategoryExistingKeywords").innerText(), /Code/);
   assert.match(await page.locator('.activity-editor-item[data-depth="1"]').first().innerText(), /Code/);
+  await page.getByRole("button", { name: "删除已有关键词 Code", exact: true }).click();
+  assert.equal(await page.getByRole("button", { name: "删除已有关键词 Code", exact: true }).count(), 0);
+  assert.equal(await page.locator("#activityCategoryExistingPattern").textContent(), "github\\.com|(Power|Shell)");
   const rootRows = page.locator('.activity-editor-item[data-depth="0"]');
   await rootRows.first().locator(".activity-editor-handle").dragTo(rootRows.last());
   assert.deepEqual(await names.allTextContents(), ["Work", "Programming", "Docs", "娱乐"]);
@@ -96,6 +99,7 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   await page.locator("#activityCategoryEditor").waitFor({ state: "hidden" });
   await page.locator("#activityContent").waitFor({ state: "visible" });
   assert.equal(writes, 1);
+  assert.equal(settings.classes.find(item => item.name.at(-1) === "Programming").rule.regex, "github\\.com|(Power|Shell)");
   const work = settings.classes.find(item => item.name.length === 1 && item.name[0] === "Work");
   assert.deepEqual(work.data.dashboardRules.apps, ["Space App.exe", "Small Tool.exe"]);
   assert.deepEqual(work.data.dashboardRules.keywords, ["学习 笔记"]);
@@ -108,6 +112,20 @@ test("category editor: app colors, drag priority, space names, major unclassifie
   assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe\nSmall Tool.exe");
   assert.match(await page.locator('.activity-editor-item[data-depth="0"]').first().innerText(), /Space App\.exe.*学习 笔记/s);
   assert.match(await page.locator("#activityUnclassifiedApps").innerText(), /没有待归类/);
+  await page.getByRole("button", { name: "删除关键词 学习 笔记", exact: true }).click();
+  await page.getByRole("button", { name: "删除程序 Small Tool.exe", exact: true }).click();
+  assert.equal(await page.locator("#activityCategoryKeywords").inputValue(), "");
+  assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe");
+  await page.locator("#activityCategorySave").click();
+  await page.locator("#activityCategoryEditor").waitFor({ state: "hidden" });
+  await page.locator("#activityCategorySettings").click();
+  await page.locator("#activityCategoryEditorContent").waitFor({ state: "visible" });
+  await names.filter({ hasText: /^Work$/ }).click();
+  assert.equal(await page.locator("#activityCategoryKeywords").inputValue(), "");
+  assert.equal(await page.locator("#activityCategoryApps").inputValue(), "Space App.exe");
+  await names.filter({ hasText: /^Programming$/ }).click();
+  assert.equal(await page.getByRole("button", { name: "删除已有关键词 Code", exact: true }).count(), 0);
+  assert.equal(await page.locator("#activityCategoryExistingPattern").textContent(), "github\\.com|(Power|Shell)");
   await page.locator("#activityCategoryCancel").click();
   assert.deepEqual(errors, []);
 });
