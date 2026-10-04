@@ -1,10 +1,10 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, screen, shell } = require("electron");
 const { spawn } = require("child_process");
 const fs = require("fs");
-const http = require("http");
 const path = require("path");
 const os = require("os");
 const { NOTE_ROOT } = require("../runtime-paths");
+const { createServerController } = require("../server-runtime");
 const { marked } = require("marked");
 const sanitizeHtml = require("sanitize-html");
 const { ArticleLibrary, DEFAULT_ROOT } = require("./articles");
@@ -16,6 +16,7 @@ function articles() {
 
 const PROJECT_DIR = path.resolve(__dirname, "..");
 const DASHBOARD_URL = "http://127.0.0.1:3456";
+const dashboardServer = createServerController({ projectDir: PROJECT_DIR, baseUrl: DASHBOARD_URL });
 const LM_STUDIO_API = "http://127.0.0.1:1234";
 const LMS_EXE = process.env.LMS_EXE || path.join(os.homedir(), ".lmstudio", "bin", "lms.exe");
 const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
@@ -440,22 +441,8 @@ function requestSelectedChatCompletion(provider, messages) {
     : requestChatCompletion(messages);
 }
 
-function dashboardIsReady() {
-  return new Promise((resolve) => {
-    const request = http.get(`${DASHBOARD_URL}/api/data`, { timeout: 900 }, (response) => {
-      response.resume();
-      resolve(response.statusCode === 200);
-    });
-    request.on("timeout", () => {
-      request.destroy();
-      resolve(false);
-    });
-    request.on("error", () => resolve(false));
-  });
-}
-
 async function ensureDashboardServer() {
-  if (await dashboardIsReady()) return true;
+  if (await dashboardServer.ready()) return true;
 
   const nodeExecutable = app.isPackaged ? path.join(process.resourcesPath, "runtime", "node.exe") : "node.exe";
   serverProcess = spawn(nodeExecutable, [path.join(PROJECT_DIR, "server.js")], {
@@ -471,7 +458,7 @@ async function ensureDashboardServer() {
   });
 
   for (let attempt = 0; attempt < 15; attempt += 1) {
-    if (await dashboardIsReady()) return true;
+    if (await dashboardServer.ready()) return true;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return false;
@@ -581,27 +568,19 @@ function closeFloatingWindow() {
   updateTrayMenu();
 }
 
-function relaunchApplication() {
-  let finished = false;
-  const relaunch = () => {
-    if (finished) return;
-    finished = true;
+let restartingApplication = false;
+async function relaunchApplication() {
+  if (restartingApplication) return;
+  restartingApplication = true;
+  try {
+    await dashboardServer.stop();
     serverProcess = undefined;
     app.relaunch();
     app.isQuitting = true;
     app.quit();
-  };
-
-  if (serverProcess?.pid) {
-    const terminator = spawn("taskkill.exe", ["/PID", String(serverProcess.pid), "/T", "/F"], {
-      windowsHide: true,
-      stdio: "ignore",
-    });
-    terminator.once("exit", relaunch);
-    terminator.once("error", relaunch);
-    setTimeout(relaunch, 3000);
-  } else {
-    relaunch();
+  } catch (error) {
+    restartingApplication = false;
+    dialog.showErrorBox("未能重启应用", error.message);
   }
 }
 
@@ -683,6 +662,7 @@ function updateTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: floatingClosed ? "打开悬浮窗" : "展开 / 收起", icon: trayMenuIcons.toggle, click: togglePanel },
     { label: "重新加载面板", icon: trayMenuIcons.reload, click: () => panelWindow.loadURL(DASHBOARD_URL) },
+    { label: "重启应用", icon: trayMenuIcons.reload, click: relaunchApplication },
     { label: "关闭悬浮窗", icon: trayMenuIcons.close, enabled: !floatingClosed, click: closeFloatingWindow },
     { type: "separator" },
     {
@@ -790,7 +770,9 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     registerIpc();
-    const dashboardReady = await ensureDashboardServer();
+    let dashboardReady;
+    try { dashboardReady = await ensureDashboardServer(); }
+    catch (error) { dialog.showErrorBox("后台需要更新", error.message); app.quit(); return; }
     createPanelWindow();
     if (dashboardReady) {
       await panelWindow.loadURL(DASHBOARD_URL);

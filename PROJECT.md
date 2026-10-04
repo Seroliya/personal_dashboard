@@ -10,6 +10,7 @@
 - `workbuddy-usage.js`：本机 WorkBuddy 网关登录和每日统计采集。
 - `activity-watch.js`：本机 ActivityWatch 按日查询和应用、小时统计；`/api/activity` 为页面数据入口。
 - `activity-categories.js`：分类编辑、普通程序名/关键词生成规则、原生校验、备份与 ActivityWatch 设置保存；`/api/activity/categories` 提供读取和保存。
+- `server-runtime.js`：后台项目/实例身份与源码版本指纹、正常关闭接口、桌面端启动/重启握手；避免只重启面板而继续复用旧后台。
 - `clash-status.js`：Clash 运行模式与代理出口 IP 地理位置；独立 `/api/clash` 接口，不阻塞平台统计。
 - `desktop-panel/main.js`：Electron 窗口、托盘、设置、Markdown 渲染与待办修改、文章 IPC、本地模型和 DeepSeek 对话。
 - `desktop-panel/panel-preload.js`：隔离界面的 IPC 桥接。
@@ -28,6 +29,7 @@
 ### 悬浮窗与托盘
 - 托盘与菜单图标使用 `desktop-panel/icons` 的 PNG 和 @2x 资源，避免 Windows nativeImage 解码 SVG 为空；打包脚本显式包含资源目录。`scripts/generate-tray-icons.cjs` 可重新生成图标。
 - 托盘菜单包括展开/收起、重新加载面板、关闭悬浮窗和退出。关闭悬浮窗隐藏面板与按钮、取消未完成动画及拖动、恢复按钮原位置，后台与托盘继续运行；菜单随后显示“打开悬浮窗”，托盘单击也可恢复。退出才结束应用。动画目标状态独立记录，避免快速切换或关闭途中使窗口重新出现。
+- “重新加载面板”仅刷新页面；“重启应用”先通过 `/api/runtime` 确认后台服务名、同一项目目录和实例，再 POST `/api/runtime/shutdown` 关闭并等待释放端口，随后重新启动桌面端。既支持本次启动的子进程，也支持已经独立运行的同项目后台，不再使用 taskkill 重启。关闭期间先停止定时器、保存登录态并关闭采集浏览器，再退出进程；最多等待 8 秒。启动时比较启动快照与当前源码指纹，旧版本后台自动关闭后重建，同版本复用。其他目录/未知服务、实例变更、超时和关闭失败会明确报错，不继续启动冲突实例。早期没有运行身份接口的后台需要一次手动迁移，之后无需每次结束 node 进程。指纹覆盖页面、后台模块和依赖锁文件，文档修改不触发后台重建。
 
 ### Markdown 与设置
 复用现有 `marked` 和 `sanitize-html` 渲染。日常待办保留独立的文件选择和复选框回写功能，文章预览不改变待办文件选择。桌面设置保存在 Electron `userData/dashboard-settings.json`；开机启动与模型自动启动维持原有设置。

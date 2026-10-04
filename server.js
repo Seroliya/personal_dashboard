@@ -3,6 +3,7 @@ const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { runtimeIdentity, handleRuntimeRequest } = require("./server-runtime");
 const { dataDirectory, browserOptions, NOTE_ROOT, waitForPlatformLogin, restoreBrowserState } = require("./runtime-paths");
 const { scrapeDeepseekUsage, collectCodexUsage, buildModelUsage } = require("./model-usage");
 const { createActivityCollector } = require("./activity-watch");
@@ -530,12 +531,14 @@ function readRequestJson(req) {
     req.on("error", reject);
   });
 }
-function startServer() {
+function startServer(shutdown) {
   const html = fs.readFileSync(path.join(__dirname, "dashboard.html"), "utf-8");
-  http
+  const identity = runtimeIdentity(__dirname);
+  return http
     .createServer(async (req, res) => {
       const requestUrl = new URL(req.url, "http://127.0.0.1");
       try {
+      if (handleRuntimeRequest(req, res, identity, shutdown)) return;
       if (requestUrl.pathname === "/api/data") {
         latestData = getSavedData();
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -636,7 +639,7 @@ function startServer() {
         }
       }
     })
-    .listen(PORT, () => console.log(`📊 http://localhost:${PORT}`));
+    .listen(PORT, "127.0.0.1", () => console.log(`📊 http://localhost:${PORT}`));
 }
 async function initializeCollector() {
   const storageState = fs.existsSync(AUTH_FILE)
@@ -709,20 +712,28 @@ async function refreshInformation() {
 
 function main() {
   console.log("🚀 personal_dashboard\n");
-  startServer();
+  const server = startServer(() => shutdown());
   void refreshCodexUsage();
   const codexTimer = setInterval(() => void refreshCodexUsage(), 60 * 1000);
   void refreshWorkbuddyUsage();
   const workbuddyTimer = setInterval(() => void refreshWorkbuddyUsage(), 60 * 1000);
   void initializeCollector();
 
+  let shuttingDown = false;
   const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     clearInterval(codexTimer);
     clearInterval(workbuddyTimer);
+    clearTimeout(refreshTimer);
+    const deadline = setTimeout(() => process.exit(0), 8000);
+    deadline.unref();
     if (browserContext) {
       await browserContext.storageState({ path: AUTH_FILE }).catch(() => {});
       await browserContext.close().catch(() => {});
     }
+    server.close();
+    server.closeIdleConnections();
     process.exit(0);
   };
   process.on("SIGINT", shutdown);

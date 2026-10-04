@@ -6,12 +6,14 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { execFileSync } = require("node:child_process");
 
-function harness() {
-  let now = 0, quits = 0;
+function harness(options = {}) {
+  let now = 0, quits = 0, restarts = 0, stops = 0;
+  const restartErrors = [];
   const frames = [];
   let tray;
   const electron = {
-    app: { isPackaged: false, requestSingleInstanceLock: () => false, quit: () => { quits++; }, on() {} },
+    app: { isPackaged: false, requestSingleInstanceLock: () => false, quit: () => { quits++; }, relaunch: () => { restarts++; }, on() {} },
+    dialog: { showErrorBox: (title, message) => restartErrors.push({ title, message }) },
     nativeImage: { createFromPath: file => {
       assert.equal(fs.readFileSync(file).subarray(1, 4).toString(), "PNG");
       return { file };
@@ -25,7 +27,9 @@ function harness() {
     },
     screen: { getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) },
   };
-  const context = { require: name => name === "electron" ? electron : require(name), __dirname,
+  const context = { require: name => name === "electron" ? electron : name === "../server-runtime" ? {
+    createServerController: () => ({ stop: async () => { stops++; if (options.stopError) throw new Error(options.stopError); } }),
+  } : require(name), __dirname,
     process, console, Buffer, fetch, setTimeout: fn => { frames.push(fn); }, clearTimeout() {}, Date: { now: () => now } };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "main.js"), "utf8") + `
     globalThis.controls = { createTray, closeFloatingWindow, togglePanel,
@@ -43,7 +47,7 @@ function harness() {
   context.controls.setWindows(handle, panel);
   context.controls.createTray();
   const flush = () => { now += 300; for (const frame of frames.splice(0)) frame(); };
-  return { controls: context.controls, handle, panel, tray, flush, quits: () => quits };
+  return { controls: context.controls, handle, panel, tray, flush, quits: () => quits, restarts: () => restarts, stops: () => stops, restartErrors };
 }
 
 test("tray menu has icons and hiding/restoring floating windows does not quit the app", () => {
@@ -81,6 +85,19 @@ test("closing during animation cancels pending frames and rapid toggles use the 
   assert.equal(h.panel.visible, false);
   assert.equal(h.handle.visible, true);
   assert.equal(h.handle.bounds.x, 1842);
+});
+
+test("restart menu closes a reused service before relaunching and reports failure without relaunch", async () => {
+  const h = harness(), initialQuits = h.quits();
+  await h.tray.menu.items.find(item => item.label === "重启应用").click();
+  assert.equal(h.stops(), 1);
+  assert.equal(h.restarts(), 1);
+  assert.equal(h.quits(), initialQuits + 1);
+  const failed = harness({ stopError: "旧后台不支持自动重启" }), previousQuits = failed.quits();
+  await failed.tray.menu.items.find(item => item.label === "重启应用").click();
+  assert.equal(failed.restarts(), 0);
+  assert.equal(failed.quits(), previousQuits);
+  assert.match(failed.restartErrors[0].message, /旧后台/);
 });
 
 test("Electron decodes tray/menu PNG assets and attaches them to native menu items", t => {
