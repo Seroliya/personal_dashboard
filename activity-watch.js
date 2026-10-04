@@ -1,7 +1,33 @@
 const os = require("node:os");
+const { getDomain } = require("tldts");
 const BASE = "http://127.0.0.1:5600/api/0";
 const TIMEZONE = "Asia/Shanghai";
 const DAY = 86400000;
+const BROWSERS = /^(?:msedge|microsoft\s*edge|chrome|google\s*chrome|chromium|firefox|brave|opera|vivaldi|arc)(?:\.exe)?$/i;
+const TITLE_SITES = [
+  ["x.com", /\s\/\s(?:X|Twitter)$/i],
+  ["bilibili.com", /(?:^|[_\s|–—-])(?:哔哩哔哩(?:_bilibili)?|bilibili)$/i],
+  ["zhihu.com", /(?:^|[\s_|–—-])知乎$/],
+  ["youtube.com", /(?:^|[\s_|–—-])YouTube$/i],
+  ["github.com", /(?:^|[\s·_|–—-])GitHub$/i],
+  ["chatgpt.com", /^ChatGPT$/i],
+  ["douyin.com", /(?:^|[\s_|–—-])抖音$/],
+];
+
+function browserDomain(data = {}) {
+  if (!BROWSERS.test(String(data.app || ""))) return null;
+  if (typeof data.url === "string" && data.url.trim()) {
+    try {
+      const url = new URL(data.url);
+      return /^https?:$/.test(url.protocol) ? getDomain(url.hostname, { extractHostname: false }) : null;
+    } catch { /* A missing or malformed URL can still have a useful title. */ }
+  }
+  const title = String(data.title || "").replace(/\u200b/g, "")
+    .replace(/\s+-\s+(?:Microsoft\s*Edge|Google Chrome|Mozilla Firefox|Brave|Opera|Vivaldi)$/i, "")
+    .replace(/\s+-\s+(?:个人|工作|个人资料\s*\d*|Profile\s*\d*|Personal|Default|Work)$/i, "")
+    .replace(/\s+(?:和另外\s+\d+\s*个页面|and\s+\d+\s+other\s+tabs?).*$/i, "").trim();
+  return TITLE_SITES.find(([, pattern]) => pattern.test(title))?.[0] || null;
+}
 
 function localDate(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE,
@@ -127,7 +153,7 @@ function summarizeActivity(period, activeEvents, awayEvents, now = new Date(), c
     if (!Number.isFinite(timestamp) || !Number.isFinite(duration) || duration < 0) throw new Error("使用记录时间无效");
     const start = Math.max(timestamp, period.start);
     const end = Math.min(timestamp + duration * 1000, period.end, now.getTime());
-    return end > start ? [{ start, end, app: String(event.data?.app || "unknown"), category: categoryPath(event.data?.$category) }] : [];
+    return end > start ? [{ start, end, app: String(event.data?.app || "unknown"), domain: browserDomain(event.data), category: categoryPath(event.data?.$category) }] : [];
   });
   const active = intervals(activeEvents);
   const exclusive = exclusiveActivity(active);
@@ -140,6 +166,15 @@ function summarizeActivity(period, activeEvents, awayEvents, now = new Date(), c
   const apps = [...byApp].map(([app, spans]) => ({ app, seconds: spans.reduce((sum, item) => sum + (item.end - item.start) / 1000, 0),
     categories: summarizeCategories(spans, classes).categories }))
     .sort((a, b) => b.seconds - a.seconds);
+  const byUsage = new Map();
+  for (const item of exclusive) {
+    const key = JSON.stringify([item.domain ? "domain" : "app", item.domain || item.app]);
+    if (!byUsage.has(key)) byUsage.set(key, []);
+    byUsage.get(key).push(item);
+  }
+  const usageEntries = [...byUsage.values()].map(spans => ({ app: spans[0].domain || spans[0].app, domain: spans[0].domain,
+    sourceApps: [...new Set(spans.map(item => item.app))].sort(), seconds: spans.reduce((sum, item) => sum + (item.end - item.start) / 1000, 0),
+    categories: summarizeCategories(spans, classes).categories })).sort((a, b) => b.seconds - a.seconds);
   const hours = Array.from({ length: 24 }, (_, hour) => {
     const start = period.start + hour * 3600000;
     const hourly = exclusive.flatMap(item => {
@@ -150,7 +185,7 @@ function summarizeActivity(period, activeEvents, awayEvents, now = new Date(), c
     return { hour, seconds: categories.reduce((sum, category) => sum + category.seconds, 0), categories };
   });
   return { date: period.date, activeSeconds: unionDuration(active.map(item => [item.start, item.end])),
-    awaySeconds: unionDuration(away.map(item => [item.start, item.end])), apps, hours,
+    awaySeconds: unionDuration(away.map(item => [item.start, item.end])), apps, usageEntries, hours,
     ...summarizeCategories(exclusive, classes), unclassifiedApps: apps.map(item => ({ app: item.app,
       seconds: item.categories.filter(category => category.path.length === 1 && category.path[0] === "Uncategorized")
         .reduce((sum, category) => sum + category.seconds, 0) })).filter(item => item.seconds > 0).sort((a, b) => b.seconds - a.seconds) };
@@ -213,4 +248,4 @@ function createActivityCollector({ fetchImpl = fetch, now = () => new Date(), ho
   return collect;
 }
 
-module.exports = { localDate, dayPeriods, summarizeActivity, createActivityCollector, effectiveClasses, categoryColor, categoryQueryLiteral };
+module.exports = { localDate, dayPeriods, summarizeActivity, createActivityCollector, effectiveClasses, categoryColor, categoryQueryLiteral, browserDomain };

@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { dayPeriods, summarizeActivity, createActivityCollector, effectiveClasses } = require("./activity-watch");
+const { dayPeriods, summarizeActivity, createActivityCollector, effectiveClasses, browserDomain } = require("./activity-watch");
 const now = new Date("2026-10-02T01:30:00+08:00");
 const event = (timestamp, duration, app = "Code.exe") => ({ timestamp, duration, data: { app, title: "private" } });
 
@@ -18,6 +18,49 @@ test("activity clips midnight and future time, unions overlaps and splits hourly
   assert.equal(JSON.stringify(data).includes("private"), false);
   assert.throws(() => dayPeriods("2026-10-03", now));
   assert.throws(() => dayPeriods("2026-02-30", now));
+});
+
+test("browser domain display prefers real URLs and recognizes site markers without guessing search titles", () => {
+  const domain = (title, url, app = "msedge.exe") => browserDomain({ app, title, url });
+  assert.equal(domain("private", "https://space.bilibili.com/123?private=1"), "bilibili.com");
+  assert.equal(domain("Home / X", "https://docs.example.co.uk/private"), "example.co.uk");
+  assert.equal(domain("首页 / X", "edge://newtab"), null);
+  assert.equal(domain("首页 / X", "https://127.0.0.1/private"), null);
+  assert.equal(domain("消息 / X 和另外 17 个页面 - 个人 - Microsoft​ Edge"), "x.com");
+  assert.equal(domain("Home / X and 2 other tabs - Google Chrome"), "x.com");
+  assert.equal(domain("视频_哔哩哔哩_bilibili - 个人 - Microsoft​ Edge"), "bilibili.com");
+  assert.equal(domain("问题 - 知乎 - Google Chrome"), "zhihu.com");
+  assert.equal(domain("项目 · GitHub - Google Chrome"), "github.com");
+  for (const title of ["bilibili - 必应搜索 - Microsoft Edge", "知乎 - 搜索 - Google Chrome", "Project X - Google Chrome", "新建标签页 - Microsoft Edge"]) assert.equal(domain(title), null, title);
+  assert.equal(domain("问题 - 知乎", undefined, "Code.exe"), null);
+});
+
+test("browser website entries conserve time and categories while preserving real app identities", () => {
+  const period = dayPeriods("2026-10-02", now)[6];
+  const sites = [
+    [0, "msedge.exe", "视频_哔哩哔哩_bilibili - Microsoft Edge", ["信息输入", "视频"]],
+    [5, "chrome.exe", "哔哩哔哩_bilibili - Google Chrome", ["信息输入", "视频"]],
+    [10, "msedge.exe", "首页 / X - Microsoft Edge", ["信息输入", "文字"]],
+    [15, "msedge.exe", "问题 - 知乎 - Microsoft Edge", ["信息输入", "文字"]],
+    [20, "msedge.exe", "新建标签页 - Microsoft Edge", ["Uncategorized"]],
+  ];
+  const events = sites.map(([minute, app, title, category]) => ({ ...event(new Date(period.start + minute * 60000).toISOString(), 300, app), data: { app, title, $category: category } }));
+  events[0].data.url = "https://space.bilibili.com/private-path?token=private-token";
+  const data = summarizeActivity(period, events, [], now);
+  assert.equal(data.activeSeconds, 1500);
+  assert.equal(data.apps.length, 2);
+  assert.deepEqual(data.apps.map(app => app.app), ["msedge.exe", "chrome.exe"]);
+  assert.equal(data.usageEntries.reduce((sum, item) => sum + item.seconds, 0), data.activeSeconds);
+  const bili = data.usageEntries.find(item => item.app === "bilibili.com");
+  assert.equal(bili.seconds, 600);
+  assert.deepEqual(bili.sourceApps, ["chrome.exe", "msedge.exe"]);
+  assert.deepEqual(bili.categories[0].path, ["信息输入", "视频"]);
+  assert.equal(data.usageEntries.find(item => item.app === "msedge.exe").seconds, 300);
+  assert.equal(data.unclassifiedApps[0].app, "msedge.exe");
+  for (const category of data.categories) assert.equal(data.usageEntries.flatMap(entry => entry.categories).filter(item => JSON.stringify(item.path) === JSON.stringify(category.path)).reduce((sum, item) => sum + item.seconds, 0), category.seconds);
+  assert.equal(JSON.stringify(data).includes("新建标签页"), false);
+  assert.equal(JSON.stringify(data).includes("private-path"), false);
+  assert.equal(JSON.stringify(data).includes("private-token"), false);
 });
 
 test("collector pairs host buckets, filters AFK in query, shares requests and supports refresh", async () => {

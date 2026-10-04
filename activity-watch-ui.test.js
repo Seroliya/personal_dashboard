@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
-const { dayPeriods } = require("./activity-watch");
+const { dayPeriods, summarizeActivity } = require("./activity-watch");
 
 test("computer usage page: day navigation, charts, refresh, empty/error states and compact layout", async t => {
   const browser = await chromium.launch({ headless: true,
@@ -142,5 +142,52 @@ test("computer usage page: day navigation, charts, refresh, empty/error states a
   await page.waitForFunction(() => document.getElementById("activityError").textContent.includes("请确认"));
   assert.equal(await page.locator("#activityContent").isVisible(), false);
   assert.equal(await page.locator("#activityRefresh").isDisabled(), false);
+  assert.deepEqual(errors, []);
+});
+
+test("browser usage shows main domains in rankings and category leaves while retaining the app count", async t => {
+  const browser = await chromium.launch({ headless: true,
+    ...(process.env.DASHBOARD_TEST_BROWSER ? { executablePath: process.env.DASHBOARD_TEST_BROWSER } : {}) });
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 360, height: 900 } });
+  const errors = []; page.on("pageerror", error => errors.push(error.message));
+  await page.route("**/*", route => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/api/activity") {
+      const date = url.searchParams.get("date"), periods = dayPeriods(date), period = periods[6];
+      const records = [
+        ["msedge.exe", "视频_哔哩哔哩_bilibili - Microsoft Edge", 1200, ["信息输入", "视频"]],
+        ["chrome.exe", "哔哩哔哩_bilibili - Google Chrome", 300, ["信息输入", "视频"]],
+        ["msedge.exe", "首页 / X - Microsoft Edge", 600, ["信息输入", "文字"]],
+        ["msedge.exe", "问题 - 知乎 - Microsoft Edge", 600, ["信息输入", "文字"]],
+        ["msedge.exe", "新建标签页 - Microsoft Edge", 300, ["Uncategorized"]],
+        ["Code.exe", "private", 600, ["Work"]],
+      ];
+      let timestamp = period.start;
+      const events = records.map(([app, title, duration, category]) => { const event = { timestamp: new Date(timestamp).toISOString(), duration, data: { app, title, $category: category } }; timestamp += duration * 1000; return event; });
+      const data = summarizeActivity(period, events, [], new Date(period.end));
+      return route.fulfill({ json: { ...data, days: periods.map(p => ({ date: p.date, activeSeconds: 3600 })) } });
+    }
+    if (url.pathname.startsWith("/api/")) return route.fulfill({ json: {} });
+    return route.fulfill({ contentType: "text/html", body: fs.readFileSync(path.join(__dirname, "dashboard.html"), "utf8") });
+  });
+  await page.goto("http://dashboard.test");
+  await page.locator("#activityModeButton").click();
+  await page.locator("#activityContent").waitFor({ state: "visible" });
+  assert.equal(await page.locator("#activityAppCount").innerText(), "3");
+  const names = await page.locator("#activityApps .activity-app-name").allTextContents();
+  assert.deepEqual(new Set(names), new Set(["bilibili.com", "x.com", "zhihu.com", "msedge", "Code"]));
+  assert.equal(names[0], "bilibili.com");
+  assert.match(await page.locator("#activityApps .activity-app-name").first().getAttribute("title"), /chrome\.exe.*msedge\.exe/s);
+  const info = page.locator("#activityCategoryTree > details").first();
+  await info.locator(":scope > summary").click();
+  await info.locator(":scope > .activity-category-children > details > summary").first().click();
+  const video = info.locator(":scope > .activity-category-children > details").first();
+  assert.equal(await video.locator(".activity-category-program .activity-category-name").innerText(), "bilibili.com");
+  assert.equal(await video.locator(".activity-category-program .activity-category-time").innerText(), "25分");
+  await info.locator(":scope > .activity-category-children > details > summary").nth(1).click();
+  const text = info.locator(":scope > .activity-category-children > details").nth(1);
+  assert.deepEqual(new Set(await text.locator(".activity-category-program .activity-category-name").allTextContents()), new Set(["x.com", "zhihu.com"]));
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
 });

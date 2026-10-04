@@ -1017,7 +1017,7 @@ function renderActivityCategoryTree(data) {
   const tree = document.getElementById("activityCategoryTree"); tree.replaceChildren();
   const percent = document.getElementById("activityCategoryPercent").checked;
   const programsByCategory = new Map();
-  (data.apps || []).forEach(app => (app.categories || []).forEach(category => {
+  (data.usageEntries || data.apps || []).forEach(app => (app.categories || []).forEach(category => {
     if (category.seconds <= 0) return;
     const key = JSON.stringify(category.path);
     if (!programsByCategory.has(key)) programsByCategory.set(key, new Map());
@@ -1140,13 +1140,15 @@ function renderActivity(data) {
   renderActivityCategoryTree(data);
   renderActivitySunburst(data);
   const apps = document.getElementById("activityApps"); apps.replaceChildren();
-  if (!data.apps.length) {
+  const usageEntries = data.usageEntries || data.apps;
+  if (!usageEntries.length) {
     const empty = document.createElement("div"); empty.className = "activity-empty"; empty.textContent = "当天没有使用记录"; apps.append(empty);
   }
   function appRow(item) {
     const row = document.createElement("div"); row.className = "activity-app-row";
     const heading = document.createElement("div"); heading.className = "activity-app-heading";
-    const name = document.createElement("span"); name.className = "activity-app-name"; name.textContent = item.app.replace(/\.exe$/i, ""); name.title = item.app;
+    const name = document.createElement("span"); name.className = "activity-app-name"; name.textContent = item.app.replace(/\.exe$/i, "");
+    name.title = [item.app, ...(item.domain ? item.sourceApps || [] : [])].join("\n");
     const duration = document.createElement("span"); duration.className = "activity-app-duration"; duration.textContent = activityDuration(item.seconds);
     heading.append(name, duration);
     const track = document.createElement("div"); track.className = "activity-app-track";
@@ -1160,8 +1162,8 @@ function renderActivity(data) {
     });
     row.append(heading, track); return row;
   }
-  data.apps.filter(item => item.seconds >= 300).forEach(item => apps.append(appRow(item)));
-  const minorApps = data.apps.filter(item => item.seconds < 300);
+  usageEntries.filter(item => item.seconds >= 300).forEach(item => apps.append(appRow(item)));
+  const minorApps = usageEntries.filter(item => item.seconds < 300);
   if (minorApps.length) {
     const group = document.createElement("details"); group.id = "activityMinorApps"; group.className = "activity-minor-apps";
     group.open = activityMinorAppsExpanded;
