@@ -9,7 +9,7 @@ const { runtimeVersion, runtimeIdentity, handleRuntimeRequest, createServerContr
 test("runtime fingerprint reflects the loaded page and backend, with distinct process identities", t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-runtime-"));
   t.after(() => { assert.equal(path.dirname(root), path.resolve(os.tmpdir())); fs.rmSync(root, { recursive: true, force: true }); });
-  for (const file of ["server.js", "server-runtime.js", "dashboard.html", "activity-watch.js", "activity-categories.js", "model-usage.js", "workbuddy-usage.js", "clash-status.js", "runtime-paths.js", "package-lock.json"]) fs.copyFileSync(path.join(__dirname, file), path.join(root, file));
+  for (const file of ["server.js", "server-runtime.js", "dashboard.html", "activity-watch.js", "activity-categories.js", "model-usage.js", "workbuddy-usage.js", "clash-status.js", "system-usage.js", "runtime-paths.js", "package-lock.json"]) fs.copyFileSync(path.join(__dirname, file), path.join(root, file));
   const first = runtimeIdentity(root), second = runtimeIdentity(root);
   assert.equal(first.version, second.version);
   assert.notEqual(first.instance, second.instance);

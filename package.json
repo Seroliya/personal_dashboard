@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "desktop": "electron desktop-panel",
-    "test": "node --test model-usage.test.js workbuddy-usage.test.js activity-watch.test.js activity-categories.test.js clash-status.test.js runtime-paths.test.js server-runtime.test.js desktop-panel/articles.test.js desktop-panel/tray.test.js",
-    "test:ui": "node --test model-usage-ui.test.js activity-watch-ui.test.js activity-categories-ui.test.js clash-status-ui.test.js desktop-panel/articles-ui.test.js",
+    "test": "node --test model-usage.test.js workbuddy-usage.test.js activity-watch.test.js activity-categories.test.js clash-status.test.js runtime-paths.test.js server-runtime.test.js system-usage.test.js desktop-panel/articles.test.js desktop-panel/tray.test.js",
+    "test:ui": "node --test model-usage-ui.test.js activity-watch-ui.test.js activity-categories-ui.test.js clash-status-ui.test.js system-usage-ui.test.js desktop-panel/articles-ui.test.js",
     "package:windows": "node scripts/package-windows.cjs"
   },
   "dependencies": {

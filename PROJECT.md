@@ -11,6 +11,7 @@
 - `activity-watch.js`：本机 ActivityWatch 按日查询和应用、小时统计；`/api/activity` 为页面数据入口。
 - `activity-categories.js`：分类编辑、普通程序名/关键词生成规则、原生校验、备份与 ActivityWatch 设置保存；`/api/activity/categories` 提供读取和保存。
 - `server-runtime.js`：后台项目/实例身份与源码版本指纹、正常关闭接口、桌面端启动/重启握手；避免只重启面板而继续复用旧后台。
+- `system-usage.js`：CPU / GPU / RAM 实时占用率，按可见页面需求采样；独立 `/api/system-usage` 接口。
 - `clash-status.js`：Clash 运行模式与代理出口 IP 地理位置；独立 `/api/clash` 接口，不阻塞平台统计。
 - `desktop-panel/main.js`：Electron 窗口、托盘、设置、Markdown 渲染与待办修改、文章 IPC、本地模型和 DeepSeek 对话。
 - `desktop-panel/panel-preload.js`：隔离界面的 IPC 桥接。
@@ -111,3 +112,4 @@
 - 界面集成：`node --test desktop-panel/articles-ui.test.js`，使用临时文章与真实 IPC 处理函数，验证图片、暂停计时、自动完成、收藏、设置持久化与原有待办。
 - 界面测试需要可用 Playwright Chromium，可用环境变量 `DASHBOARD_TEST_BROWSER` 指定浏览器程序。本机已有浏览器位于 `%LOCALAPPDATA%\ms-playwright\chromium-1124\chrome-win\chrome.exe`。
 - 验收：470px 面板无横向溢出；每日推荐可打开、阅读后划线、重启保留；收藏文件只加一个星星；普通网页和目录不可用时有清楚提示。测试使用临时目录，不批量修改真实文章。
+- 实时资源：`node --test system-usage.test.js system-usage-ui.test.js`，验证 CPU 差分、GPU 分片/零值/失效、共享读取与空闲清理、页面切换暂停和 360px 排版。

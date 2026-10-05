@@ -12,6 +12,8 @@ const { createWorkbuddyCollector } = require("./workbuddy-usage");
 const collectWorkbuddyUsage = createWorkbuddyCollector();
 const { createClashCollector } = require("./clash-status");
 const collectClashStatus = createClashCollector();
+const { createSystemUsageCollector } = require("./system-usage");
+const collectSystemUsage = createSystemUsageCollector();
 chromium.use(StealthPlugin());
 const PORT = 3456;
 const REFRESH_MS = 10 * 60 * 1000;
@@ -553,6 +555,9 @@ function startServer(shutdown) {
             nextRefreshAt,
           }),
         );
+      } else if (requestUrl.pathname === "/api/system-usage" && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+        res.end(JSON.stringify(collectSystemUsage()));
       } else if (requestUrl.pathname === "/api/clash" && req.method === "GET") {
         const status = await collectClashStatus(requestUrl.searchParams.get("refresh") === "1");
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
@@ -675,6 +680,7 @@ async function refreshInformation() {
   if (refreshPromise) return refreshPromise;
   if (refreshTimer) {
     clearTimeout(refreshTimer);
+    collectSystemUsage.dispose();
     refreshTimer = undefined;
   }
 

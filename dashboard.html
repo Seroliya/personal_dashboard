@@ -578,6 +578,8 @@
   .activity-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #eee; }
   .activity-value { display: block; font-size: clamp(16px, 4.4vw, 21px); white-space: nowrap; font-weight: 600; color: #4f46e5; }
   .activity-label { font-size: 11px; color: #999; }
+  .system-usage { margin-top: 5px; color: #000; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .system-usage span + span { margin-left: 12px; }
   .activity-section { padding: 14px 0; border-bottom: 1px solid #eee; }
   .activity-title { color: #555; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
   .activity-chart { display: flex; align-items: flex-end; gap: 6px; height: 95px; }
@@ -961,6 +963,7 @@ function hideActivityCategoryTooltip() {
 function bindActivityCategoryTooltip(element, text) {
   element.setAttribute("aria-label", text);
   const show = () => {
+  <div class="system-usage" id="systemUsage" role="group" aria-label="电脑资源占用"><span id="systemCpu">CPU --</span><span id="systemGpu">GPU --</span><span id="systemRam">RAM --</span></div>
     const tooltip = document.getElementById("activityCategoryTooltip");
     tooltip.textContent = text; tooltip.hidden = false;
     element.setAttribute("aria-describedby", "activityCategoryTooltip");
@@ -2060,6 +2063,30 @@ async function sendChatMessage() {
     );
     pending.remove();
     addChatMessage("assistant", result.content);
+let systemUsageBusy = false;
+function renderSystemUsage(data) {
+  const percent = value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100
+    ? `${Math.round(value)}%` : "--";
+  document.getElementById("systemCpu").textContent = `CPU ${percent(data?.cpuPercent)}`;
+  const gpu = document.getElementById("systemGpu");
+  gpu.textContent = `GPU ${percent(data?.gpuPercent)}`;
+  gpu.title = Array.isArray(data?.gpus) ? data.gpus.map(item => `${item.name} · ${percent(item.percent)}`).join("\n") : "";
+  const ram = document.getElementById("systemRam");
+  ram.textContent = `RAM ${percent(data?.ramPercent)}`;
+  ram.title = data?.totalBytes > 0 ? `${(data.usedBytes / 1024 ** 3).toFixed(1)} / ${(data.totalBytes / 1024 ** 3).toFixed(1)} GB` : "";
+}
+
+async function fetchSystemUsage() {
+  if (systemUsageBusy || document.hidden || document.getElementById("summaryMode").hidden) return;
+  systemUsageBusy = true;
+  try {
+    const response = await fetch("/api/system-usage", { signal: AbortSignal.timeout(2000) });
+    if (!response.ok) throw new Error("System usage unavailable");
+    renderSystemUsage(await response.json());
+  } catch { renderSystemUsage(null); }
+  finally { systemUsageBusy = false; }
+}
+
     session.messages.push({ role: "assistant", content: result.content });
     session.updatedAt = Date.now();
     saveChatSessions();
@@ -2079,6 +2106,8 @@ async function sendChatMessage() {
     input.focus();
   }
 }
+  document.getElementById("systemUsage").hidden = selectedMode !== "summary";
+  if (selectedMode === "summary") void fetchSystemUsage();
 
 let articleItems = [];
 let readingArticle = null;
@@ -2630,3 +2659,7 @@ document.getElementById("refreshInformationButton").addEventListener("click", re
 </script>
 </body>
 </html>
+setInterval(fetchSystemUsage, 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) void fetchSystemUsage();
+});
