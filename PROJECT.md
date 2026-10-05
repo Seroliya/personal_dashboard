@@ -45,6 +45,11 @@
 - 默认读取 `%APPDATA%/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml`；`CLASH_CONFIG_PATH` 可覆盖。优先命名管道，适配 Verge 生成配置与实际管道名称不同的版本（按配置哈希匹配唯一运行管道），否则使用 TCP 控制接口。认证密钥仅留在服务端内存，不向页面返回。
 - HTTPS 地理查询 `https://ipwho.is/` 显式经过本地 Clash HTTP/mixed 端口，不回退直连。运行状态缓存 15 秒、出口位置缓存 2 分钟，合并并发请求，“更新数据”强制刷新；关闭/失败时清除旧出口，网络请求有超时。只读，不修改 Clash 配置。打包包含新模块及 `yaml`、`https-proxy-agent` 生产依赖；v1.1.0 旧压缩包未包含此更新。
 
+### 电脑资源占用
+- 仅在“信息总结”显示，位于 Clash 状态下方、开发者署名上方，黑色文字横排 CPU / GPU / RAM 百分比，每秒刷新；切换页面或隐藏窗口暂停请求，返回立即更新。GPU 悬停显示显卡名及各卡占用，RAM 悬停显示已用/总物理内存。
+- CPU 为所有逻辑核心的相邻一秒系统时间差分；RAM 为系统物理内存已用比例。GPU 使用 NVIDIA 驱动的 `nvidia-smi --query-gpu=index,name,utilization.gpu --format=csv,noheader,nounits --loop-ms=1000` 持续读取，多个请求共用单一进程，多卡主值为最大占用；可用 `NVIDIA_SMI_PATH` 指定工具路径。不依赖 NVIDIA 浮窗开关，不支持的显卡或读取失败显示 `--`，零占用显示 0%。
+- 五秒无请求即停止采样及 GPU 进程，后台关闭主动清理。GPU 数据超过 2.5 秒视为过期，卡住的读取器四秒后停止；失败退避十秒重试。数据不写入 data.json。打包清单和运行源码指纹包含此模块。
+
 ### 城市天气
 - 内置上海（`WwcJd`）和重庆（`UkfaS`），在天气卡片内切换；当前选择使用浏览器 `localStorage` 持久化。
 - 默认只显示城市切换和“⋯”管理入口；添加、删除在展开菜单后使用。搜索输入显式遵守 `hidden`，点击外部收起菜单，取消或 Escape 关闭搜索并中止未完成查询。
@@ -107,9 +112,9 @@
 - 模型用量：`node --test model-usage.test.js workbuddy-usage.test.js model-usage-ui.test.js`；UI 测试同样支持 `DASHBOARD_TEST_BROWSER`，覆盖跨月/换日、缓存和价格口径、WorkBuddy 登录与积分、缺失/失败状态、三色堆叠、悬停和键盘提示以及窄面板布局。
 - 电脑使用：`node --test activity-watch.test.js activity-watch-ui.test.js`，覆盖跨日和时段裁剪、重叠统计及分类时长守恒、父子直接时间、颜色继承、分类集优先级、缓存、原生 AFK/分类查询、日期切换、刷新、分类树展开和百分比、堆叠比例、旭日图/悬停、错误与空态、360px 排版。
 - 分类设置：`node --test activity-categories.test.js activity-categories-ui.test.js`，覆盖带空格/特殊字符的精确程序名、旧规则和外部更新保留、优先级映射、冲突校验、分类集保留与失败回滚、拖动排序、未分类程序定位/快速归类、关键词、父级配置、保存持久化及应用颜色更新。
+- 实时资源：`node --test system-usage.test.js system-usage-ui.test.js`，验证 CPU 差分、GPU 分片/零值/失效、共享读取与空闲清理、页面切换暂停和 360px 排版。
 - Clash：`node --test clash-status.test.js clash-status-ui.test.js`，验证运行模式与系统代理、缓存和失败清理、强制刷新、真实 HTTP CONNECT 路由，以及状态行/悬停 IP/360px 长位置排版。
 - 推荐逻辑：`node --test desktop-panel/articles.test.js`，覆盖默认读完 4 篇才完成任务、跨批次累计、同篇去重计数、换日、刷新换批、目录更新和中断恢复、身份迁移，以及数量调整、收藏幂等、重启、90 天边界、同名保护和损坏记录。
 - 界面集成：`node --test desktop-panel/articles-ui.test.js`，使用临时文章与真实 IPC 处理函数，验证图片、暂停计时、自动完成、收藏、设置持久化与原有待办。
 - 界面测试需要可用 Playwright Chromium，可用环境变量 `DASHBOARD_TEST_BROWSER` 指定浏览器程序。本机已有浏览器位于 `%LOCALAPPDATA%\ms-playwright\chromium-1124\chrome-win\chrome.exe`。
 - 验收：470px 面板无横向溢出；每日推荐可打开、阅读后划线、重启保留；收藏文件只加一个星星；普通网页和目录不可用时有清楚提示。测试使用临时目录，不批量修改真实文章。
-- 实时资源：`node --test system-usage.test.js system-usage-ui.test.js`，验证 CPU 差分、GPU 分片/零值/失效、共享读取与空闲清理、页面切换暂停和 360px 排版。
