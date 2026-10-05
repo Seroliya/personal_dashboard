@@ -40,7 +40,7 @@
 - 天气当前和明日信息横排，长描述可悬停查看全文，空错误区域不占高度。
 
 ### Clash 状态
-- 页面底部、Developed by kiro_kiya 上方以一行黑色文字显示模式与出口地区，悬停查看完整 IP；没有独立卡片。模式读取 Mihomo `/configs` 的 `tun.enable`，普通代理同时核对 Windows 当前用户系统代理是否启用且指向 Clash 端口；未开启显示“未启用”，接口不可用显示“未连接”，地理位置失败只显示“位置未知”。
+- 仅在“信息总结”页面底部、Developed by kiro_kiya 上方以一行黑色文字显示模式与出口地区；切换到其他页面隐藏状态行，悬停查看完整 IP；没有独立卡片。模式读取 Mihomo `/configs` 的 `tun.enable`，普通代理同时核对 Windows 当前用户系统代理是否启用且指向 Clash 端口；未开启显示“未启用”，接口不可用显示“未连接”，地理位置失败只显示“位置未知”。
 - 默认读取 `%APPDATA%/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml`；`CLASH_CONFIG_PATH` 可覆盖。优先命名管道，适配 Verge 生成配置与实际管道名称不同的版本（按配置哈希匹配唯一运行管道），否则使用 TCP 控制接口。认证密钥仅留在服务端内存，不向页面返回。
 - HTTPS 地理查询 `https://ipwho.is/` 显式经过本地 Clash HTTP/mixed 端口，不回退直连。运行状态缓存 15 秒、出口位置缓存 2 分钟，合并并发请求，“更新数据”强制刷新；关闭/失败时清除旧出口，网络请求有超时。只读，不修改 Clash 配置。打包包含新模块及 `yaml`、`https-proxy-agent` 生产依赖；v1.1.0 旧压缩包未包含此更新。
 

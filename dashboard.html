@@ -2018,6 +2018,8 @@ async function setAppMode(mode) {
     button.setAttribute("aria-selected", String(active));
   });
 
+  document.getElementById("clashStatus").hidden = selectedMode !== "summary";
+
   if (selectedMode === "activity") void loadActivity();
   if (selectedMode === "chat") {
     await startChatMode();
