@@ -24,7 +24,7 @@ const runtime = path.join(bundle, "resources", "runtime");
 fs.mkdirSync(app, { recursive: true });
 fs.mkdirSync(runtime, { recursive: true });
 const files = ["dashboard.html", "server.js", "server-runtime.js", "model-usage.js", "workbuddy-usage.js", "activity-watch.js", "activity-categories.js",
-  "runtime-paths.js", "clash-status.js", "system-usage.js", "ccusage.dashboard.json", "package.json", "package-lock.json", "README.md"];
+  "runtime-paths.js", "clash-status.js", "system-usage.js", "network-usage.ps1", "ccusage.dashboard.json", "package.json", "package-lock.json", "README.md"];
 for (const file of files) fs.copyFileSync(path.join(root, file), path.join(app, file));
 fs.mkdirSync(path.join(app, "desktop-panel"));
 fs.cpSync(path.join(root, "desktop-panel", "icons"), path.join(app, "desktop-panel", "icons"), { recursive: true });

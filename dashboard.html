@@ -553,7 +553,10 @@
   .footer { margin-top: 20px; font-size: 11px; color: #bbb; }
   .footer-credit { margin-top: 5px; }
   .system-usage { margin-top: 5px; color: #000; font-size: 11px; font-variant-numeric: tabular-nums; }
-  .system-usage span + span { margin-left: 12px; }
+  .system-usage { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+  .system-usage[hidden] { display: none; }
+  .system-network { margin-left: auto; }
+  @media (max-width: 380px) { .system-usage { gap: 6px; font-size: 10px; } }
 
   .article-row { display: flex; align-items: flex-start; gap: 9px; padding: 11px 0; border-bottom: 1px solid #eee; }
   .article-row:last-child { border-bottom: 0; }
@@ -911,7 +914,7 @@
 
 <div class="footer">
   <div class="clash-status" id="clashStatus">Clash · 查询中</div>
-  <div class="system-usage" id="systemUsage" role="group" aria-label="电脑资源占用"><span id="systemCpu">CPU --</span><span id="systemGpu">GPU --</span><span id="systemRam">RAM --</span></div>
+  <div class="system-usage" id="systemUsage" role="group" aria-label="电脑资源占用和实时网速"><span id="systemCpu">CPU --</span><span id="systemGpu">GPU --</span><span id="systemRam">RAM --</span><span class="system-network" id="systemNetwork" aria-label="下载和上传网速">↓ -- · ↑ --</span></div>
   <div class="footer-credit">Developed by kiro_kiya</div>
 </div>
 </div>
@@ -2004,6 +2007,13 @@ async function startChatMode(forceLocalStart = false) {
 }
 
 let systemUsageBusy = false;
+function formatNetworkSpeed(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return "--";
+  const units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+  return `${value.toFixed(unit && value < 10 ? 1 : 0)} ${units[unit]}`;
+}
 function renderSystemUsage(data) {
   const percent = value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100
     ? `${Math.round(value)}%` : "--";
@@ -2014,6 +2024,11 @@ function renderSystemUsage(data) {
   const ram = document.getElementById("systemRam");
   ram.textContent = `RAM ${percent(data?.ramPercent)}`;
   ram.title = data?.totalBytes > 0 ? `${(data.usedBytes / 1024 ** 3).toFixed(1)} / ${(data.totalBytes / 1024 ** 3).toFixed(1)} GB` : "";
+  const network = document.getElementById("systemNetwork");
+  const download = formatNetworkSpeed(data?.network?.downloadBytesPerSecond);
+  const upload = formatNetworkSpeed(data?.network?.uploadBytesPerSecond);
+  network.textContent = `↓ ${download} · ↑ ${upload}`;
+  network.title = data?.network ? `下载 ${download} · 上传 ${upload}${Array.isArray(data.network.interfaces) && data.network.interfaces.length ? `\n${data.network.interfaces.join("、")}` : ""}` : "";
 }
 
 async function fetchSystemUsage() {

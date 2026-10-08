@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
-const { cpuTimes, cpuUsage, parseGpuLine, createSystemUsageCollector } = require("./system-usage");
+const { cpuTimes, cpuUsage, parseGpuLine, networkRate, createNetworkReader, createSystemUsageCollector } = require("./system-usage");
 
 test("CPU uses interval deltas across all logical cores, including idle and counter reset", () => {
   const before = cpuTimes([{ times: { idle: 80, user: 20 } }, { times: { idle: 60, user: 40 } }]);
@@ -26,6 +26,7 @@ function fixture() {
   const collector = createSystemUsageCollector({
     system: { cpus: () => [{ times: { idle, user } }], totalmem: () => 1000, freemem: () => 400 },
     now: () => time,
+    network: { tick() {}, stop() {}, read: () => null },
     schedule: callback => { tick = callback; return { unref() {} }; },
     cancel: () => { canceled = true; },
     spawnGpu: (file, args, options) => {
@@ -71,4 +72,49 @@ test("hidden-page inactivity stops GPU reader; returning creates a fresh reader 
   assert.equal(f.collector().gpuPercent, null);
   assert.equal(f.children.length, 2);
   f.collector.dispose();
+});
+
+test("network rates use elapsed time, sum existing adapters and rebaseline reset or new adapters", () => {
+  const sample = (timestamp, received, sent) => ({ timestamp, interfaces: [{ id: "ethernet", name: "Ethernet", received, sent }] });
+  assert.equal(networkRate(null, sample(1000, 100, 50)), null);
+  assert.deepEqual(networkRate(sample(1000, 100, 50), sample(3000, 2100, 550)), {
+    downloadBytesPerSecond: 1000, uploadBytesPerSecond: 250, interfaces: ["Ethernet"],
+  });
+  assert.equal(networkRate(sample(1000, 100, 50), sample(2000, 10, 20)), null);
+  assert.equal(networkRate(sample(1000, 100, 50), sample(1000, 100, 50)), null);
+  assert.equal(networkRate(sample(1000, 100, 50), sample(2000, 100, 50)).downloadBytesPerSecond, 0);
+  assert.deepEqual(networkRate(sample(1000, 100, 50), { timestamp: 2000, interfaces: [] }), {
+    downloadBytesPerSecond: 0, uploadBytesPerSecond: 0, interfaces: [],
+  });
+  const before = sample(1000, 100, 50), after = sample(2000, 200, 100);
+  before.interfaces.push({ id: "wifi", name: "WiFi", received: 1000, sent: 1000 });
+  after.interfaces.push({ id: "wifi", name: "WiFi", received: 2000, sent: 2000 });
+  after.interfaces.push({ id: "new", name: "New", received: 999999, sent: 999999 });
+  assert.equal(networkRate(before, after).downloadBytesPerSecond, 1100);
+  assert.equal(networkRate(before, after).uploadBytesPerSecond, 1050);
+});
+
+test("network reader shares a persistent process, handles fragmented output, expiry, failure and cleanup", () => {
+  let now = 1000;
+  const children = [];
+  const reader = createNetworkReader({ platform: "win32", now: () => now, spawnNetwork: (file, args, options) => {
+    assert.equal(options.windowsHide, true);
+    assert.match(args.at(-1), /network-usage\.ps1$/);
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stdout.setEncoding = () => {};
+    child.kill = () => { child.killed = true; child.emit("close"); };
+    children.push(child); return child;
+  } });
+  reader.tick(); reader.tick(); assert.equal(children.length, 1);
+  const send = (timestamp, received) => JSON.stringify({ timestamp, interfaces: [{ id: "nic", name: "网卡", received, sent: 0 }] });
+  children[0].stdout.emit("data", send(1000, 100) + "\n" + send(2000, 2100).slice(0, 20));
+  assert.equal(reader.read(), null);
+  children[0].stdout.emit("data", send(2000, 2100).slice(20) + "\n");
+  assert.equal(reader.read().downloadBytesPerSecond, 2000);
+  now = 4500; assert.equal(reader.read(), null);
+  children[0].stdout.emit("data", '{"error":true}\n'); assert.equal(reader.read(), null);
+  now = 7000; reader.tick(); assert.equal(children[0].killed, true);
+  reader.tick(); assert.equal(children.length, 1);
+  now = 18000; reader.tick(); assert.equal(children.length, 2);
+  children[1].emit("error", new Error("unavailable")); assert.equal(reader.read(), null);
+  now = 30000; reader.tick(); reader.stop(); assert.equal(children[2].killed, true);
 });

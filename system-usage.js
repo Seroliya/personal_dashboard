@@ -1,5 +1,72 @@
 const os = require("node:os");
 const { spawn } = require("node:child_process");
+const path = require("node:path");
+
+function networkRate(previous, current) {
+  if (!previous || current.timestamp <= previous.timestamp) return null;
+  const elapsed = (current.timestamp - previous.timestamp) / 1000;
+  const old = new Map(previous.interfaces.map(item => [item.id, item]));
+  let downloadBytesPerSecond = 0, uploadBytesPerSecond = 0, matched = 0;
+  for (const item of current.interfaces) {
+    const before = old.get(item.id);
+    if (!before || item.received < before.received || item.sent < before.sent) continue;
+    downloadBytesPerSecond += (item.received - before.received) / elapsed;
+    uploadBytesPerSecond += (item.sent - before.sent) / elapsed;
+    matched++;
+  }
+  if (current.interfaces.length && !matched) return null;
+  return { downloadBytesPerSecond, uploadBytesPerSecond,
+    interfaces: current.interfaces.map(item => item.name) };
+}
+
+function createNetworkReader({ spawnNetwork = spawn, now = Date.now, platform = process.platform } = {}) {
+  let child, previous, latest, updatedAt = 0, startedAt = 0, retryAt = 0;
+  function stop() {
+    const current = child;
+    child = null;
+    previous = latest = null;
+    retryAt = 0;
+    if (current) current.kill();
+  }
+  function tick() {
+    if (child && now() - Math.max(startedAt, updatedAt) > 5000) {
+      stop(); retryAt = now() + 10000;
+    }
+    if (child || now() < retryAt || platform !== "win32") return;
+    try {
+      child = spawnNetwork("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        "-File", path.join(__dirname, "network-usage.ps1")], { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+    } catch { retryAt = now() + 10000; return; }
+    const current = child;
+    startedAt = now(); updatedAt = 0;
+    let buffer = "";
+    current.stdout.setEncoding("utf8");
+    current.stdout.on("data", chunk => {
+      if (child !== current) return;
+      buffer += chunk;
+      const lines = buffer.split(/\r?\n/); buffer = lines.pop();
+      for (const line of lines) {
+        let snapshot;
+        try { snapshot = JSON.parse(line); } catch { continue; }
+        if (!Number.isFinite(snapshot.timestamp) || !Array.isArray(snapshot.interfaces) ||
+          snapshot.interfaces.some(item => !item || typeof item.id !== "string" || typeof item.name !== "string" ||
+            !Number.isSafeInteger(item.received) || item.received < 0 || !Number.isSafeInteger(item.sent) || item.sent < 0)) {
+          previous = latest = null; continue;
+        }
+        latest = networkRate(previous, snapshot);
+        previous = snapshot;
+        updatedAt = now();
+      }
+      if (buffer.length > 65536) { stop(); retryAt = now() + 10000; }
+    });
+    const exited = () => {
+      if (child !== current) return;
+      child = null; previous = latest = null; retryAt = now() + 10000;
+    };
+    current.on("error", exited); current.on("close", exited);
+  }
+  return { tick, stop, read: () => latest && now() - updatedAt <= 3000 ? latest : null };
+}
 
 function cpuTimes(cpus) {
   return cpus.reduce((sum, cpu) => {
@@ -26,7 +93,7 @@ function parseGpuLine(line) {
 }
 
 function createSystemUsageCollector({ system = os, spawnGpu = spawn, now = Date.now,
-  schedule = setInterval, cancel = clearInterval } = {}) {
+  schedule = setInterval, cancel = clearInterval, network = createNetworkReader({ now }) } = {}) {
   let timer, processGpu, previousCpu, cpuPercent = null, lastRequest = 0, retryAt = 0;
   let gpuValues = new Map();
 
@@ -78,6 +145,7 @@ function createSystemUsageCollector({ system = os, spawnGpu = spawn, now = Date.
     previousCpu = null;
     cpuPercent = null;
     stopGpu();
+    network.stop();
     retryAt = 0;
   }
 
@@ -90,6 +158,7 @@ function createSystemUsageCollector({ system = os, spawnGpu = spawn, now = Date.
     const newest = Math.max(processGpu?.startedAt || 0, ...[...gpuValues.values()].map(gpu => gpu.updatedAt));
     if (processGpu && now() - newest > 4000) stopGpu();
     startGpu();
+    network.tick();
   }
 
   function collect() {
@@ -97,6 +166,7 @@ function createSystemUsageCollector({ system = os, spawnGpu = spawn, now = Date.
     if (!timer) {
       previousCpu = cpuTimes(system.cpus());
       startGpu();
+      network.tick();
       timer = schedule(tick, 1000);
       timer.unref?.();
     }
@@ -106,10 +176,11 @@ function createSystemUsageCollector({ system = os, spawnGpu = spawn, now = Date.
       .sort((a, b) => a.index - b.index).map(({ index, name, percent }) => ({ index, name, percent }));
     const available = gpus.map(gpu => gpu.percent).filter(value => value !== null);
     return { cpuPercent, gpuPercent: available.length ? Math.max(...available) : null,
-      ramPercent: totalBytes > 0 ? usedBytes / totalBytes * 100 : null, usedBytes, totalBytes, gpus };
+      ramPercent: totalBytes > 0 ? usedBytes / totalBytes * 100 : null, usedBytes, totalBytes, gpus,
+      network: network.read() };
   }
   collect.dispose = dispose;
   return collect;
 }
 
-module.exports = { cpuTimes, cpuUsage, parseGpuLine, createSystemUsageCollector };
+module.exports = { cpuTimes, cpuUsage, parseGpuLine, networkRate, createNetworkReader, createSystemUsageCollector };

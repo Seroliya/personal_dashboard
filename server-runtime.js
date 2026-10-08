@@ -4,7 +4,7 @@ const crypto = require("node:crypto");
 
 const SERVICE = "personal-dashboard";
 const RUNTIME_FILES = ["server.js", "server-runtime.js", "dashboard.html", "activity-watch.js", "activity-categories.js",
-  "model-usage.js", "workbuddy-usage.js", "clash-status.js", "system-usage.js", "runtime-paths.js", "package-lock.json"];
+  "model-usage.js", "workbuddy-usage.js", "clash-status.js", "system-usage.js", "network-usage.ps1", "runtime-paths.js", "package-lock.json"];
 const canonicalPath = directory => path.resolve(directory).replace(/\\/g, "/").toLowerCase();
 
 function runtimeVersion(projectDir) {

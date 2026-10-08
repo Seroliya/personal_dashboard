@@ -17,6 +17,7 @@ test("resource line stays below Clash, updates live, clears failures and pauses 
       requests++;
       return route.fulfill(fail ? { status: 503, body: "unavailable" } : { json: {
         cpuPercent: value, gpuPercent: 0, ramPercent: 60, usedBytes: 12 * 1024 ** 3, totalBytes: 20 * 1024 ** 3,
+        network: { downloadBytesPerSecond: 1536, uploadBytesPerSecond: 0, interfaces: ["以太网 2"] },
         gpus: [{ name: "NVIDIA GeForce RTX 5070 Ti Laptop GPU", percent: 0 }],
       } });
     }
@@ -28,11 +29,17 @@ test("resource line stays below Clash, updates live, clears failures and pauses 
   assert.equal(await page.locator("#systemGpu").innerText(), "GPU 0%");
   assert.match(await page.locator("#systemGpu").getAttribute("title"), /5070 Ti/);
   assert.equal(await page.locator("#systemRam").getAttribute("title"), "12.0 / 20.0 GB");
+  assert.equal(await page.locator("#systemNetwork").innerText(), "↓ 1.5 KB/s · ↑ 0 B/s");
+  assert.match(await page.locator("#systemNetwork").getAttribute("title"), /以太网 2/);
   const clash = await page.locator("#clashStatus").boundingBox();
   const usage = await page.locator("#systemUsage").boundingBox();
   const credit = await page.locator(".footer-credit").boundingBox();
   assert.ok(clash.y + clash.height <= usage.y && usage.y + usage.height <= credit.y);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.evaluate(() => renderSystemUsage({cpuPercent: 100, gpuPercent: 100, ramPercent: 100, network: {downloadBytesPerSecond: 999 * 1024 ** 4, uploadBytesPerSecond: 999 * 1024 ** 4}}));
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  const cpuBox = await page.locator('#systemCpu').boundingBox(), netBox = await page.locator('#systemNetwork').boundingBox();
+  assert.equal(cpuBox.y, netBox.y);
   value = 47;
   await page.waitForFunction(() => document.getElementById("systemCpu").textContent === "CPU 47%");
   for (const mode of ["todo", "activity", "chat"]) {
@@ -46,6 +53,8 @@ test("resource line stays below Clash, updates live, clears failures and pauses 
   await page.evaluate(() => { void setAppMode("summary"); });
   await page.waitForFunction(() => document.getElementById("systemCpu").textContent === "CPU --");
   assert.equal(await page.locator("#systemGpu").getAttribute("title"), "");
+  assert.equal(await page.locator("#systemNetwork").innerText(), "↓ -- · ↑ --");
+  assert.equal(await page.locator("#systemNetwork").getAttribute("title"), "");
   await page.evaluate(() => Object.defineProperty(document, "hidden", { configurable: true, value: true }));
   const hiddenRequests = requests;
   await page.waitForTimeout(1200);
